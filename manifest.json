@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "Mod randomizer",
+  "description": "Mark the mods on the list of extensions, click save & randomize, it will pick one randomly." ,
+  "version": "1.0",
+  "permissions": [
+    "management",
+    "storage"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "32": "icons/icon_32.png",
+      "64": "icons/icon_64.png",
+      "128": "icons/icon_128.png",
+      "18": "icons/icon_18.png"
+    }
+  },
+  "icons": {
+    "32": "icons/icon_32.png",
+    "64": "icons/icon_64.png",
+    "128": "icons/icon_128.png",
+    "18": "icons/icon_18.png"
+  }
+}
