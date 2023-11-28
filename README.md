@@ -1,1 +1,0 @@
-# Mod-randomizer-for-Opera-GX
