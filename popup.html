@@ -1,22 +1,32 @@
 <!DOCTYPE html>
-<html>
-<head>
-  <title>Mod Extensions</title>
-  <style>
-    label {
-      display: block;
-      margin-bottom: 8px;
-    }
-  </style>
-</head>
-<body>
-  <h2>Mod Extensions</h2>
-  <form id="modForm">
-    <div id="extensionList"></div>
-    <button type="submit">Save</button>
-    <button id="randomizeButton" type="button">Randomize</button>
-  </form>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="popup.css" />
+    <title>Mod Extensions</title>
+  </head>
+  <body>
+    <h2>Mod Extensions</h2>
+    
+    <form id="modForm">
+      <!-- Add a wrapper for the "Automatic Mod Identification" button -->
+      <div class="auto-identification-container">
+        <label>
+          <input type="checkbox" id="toggleAutoModIdentification" />
+          Automatic Mod Identification
+        </label>
+      </div>
+      
+      <div id="extensionList"></div>
 
-  <script src="popup.js"></script>
-</body>
+      <div class="button-container">
+        <button type="submit">Save</button>
+        <button id="randomizeButton" type="button">Randomize</button>
+      </div>
+    </form>
+
+    <script src="popup.js"></script>
+  </body>
 </html>

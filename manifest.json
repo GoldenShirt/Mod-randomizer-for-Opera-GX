@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Mod randomizer",
   "description": "Mark the mods on the list of extensions, click save & randomize, it will pick one randomly." ,
-  "version": "1.0",
+  "version": "1.9",
   "permissions": [
     "management",
     "storage"

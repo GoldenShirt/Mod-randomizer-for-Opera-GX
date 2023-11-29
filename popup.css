@@ -1,0 +1,87 @@
+body {
+  width: 20rem;
+}
+
+ul {
+  list-style-type: none;
+  padding-inline-start: 0;
+  margin: 1rem 0;
+}
+
+li {
+  padding: 0.25rem;
+}
+
+li:nth-child(odd) {
+  background: #80808030;
+}
+
+li:nth-child(even) {
+  background: #ffffff;
+}
+
+h3,
+p {
+  margin: 0;
+}
+
+label {
+  display: block;
+  margin-bottom: 10px; /* Adjusted for a tiny bit more lowering */
+  vertical-align: middle; /* Set vertical alignment to middle */
+}
+
+input[type="checkbox"],
+button {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  outline: none;
+  vertical-align: middle; /* Set vertical alignment to middle */
+}
+
+input[type="checkbox"] {
+  margin-right: 8px;
+  position: relative;
+  top: -1px; /* Adjust the value for better alignment */
+  width: 20px;
+  height: 20px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  background-color: #fff;
+}
+
+input[type="checkbox"]:checked {
+  background-color: #007bff;
+}
+
+button {
+  margin: 8px 0;
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  background-color: #007bff;
+  color: #fff;
+  cursor: pointer;
+}
+
+/* Add some margin between extension checkmarks and buttons */
+#extensionList {
+  margin-bottom: 20px; /* Adjust the value as needed */
+}
+
+/* Add styles for the button container */
+.button-container {
+  display: flex;
+  flex-direction: column;
+  margin-top: 20px; /* Adjust the value as needed */
+  border-top: 1px solid #ccc; /* Add a top border to visually separate the buttons */
+  padding-top: 10px; /* Adjust the value for spacing */
+}
+
+/* Add styles for the container of "Automatic Mod Identification" */
+.auto-identification-container {
+  margin-bottom: 20px; /* Adjust the value as needed */
+  border-bottom: 1px solid #ccc; /* Add a bottom border to visually separate from checkmarks */
+  padding-bottom: 10px; /* Adjust the value for spacing */
+}

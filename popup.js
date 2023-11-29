@@ -36,9 +36,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Save the mod extension IDs to local storage
     chrome.storage.local.set({ modExtensionIds: modExtensionIds }, function() {
-      console.log('Mod extensions saved:', modExtensionIds);
-      window.close();
+      // Send a message to the background script
+      console.log({ type: 'modExtensionsSaved', data: modExtensionIds });
+		window.close(); //Disable this line when changing the code.
     });
+	
+	
+	
+	
   });
 
   randomizeButton.addEventListener('click', function() {
