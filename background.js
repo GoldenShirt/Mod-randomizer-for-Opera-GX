@@ -7,12 +7,6 @@ chrome.runtime.onInstalled.addListener(function () {
   });
 });
 
-
-
-
-
-
-
 chrome.runtime.onStartup.addListener(async function() {
   // Retrieve mod extension IDs from local storage
   const result = await new Promise((resolve) => {

@@ -33,7 +33,7 @@ chrome.management.getAll(function(extensions) {
 
 
 
-// Mod auto indentification by default (doesnt work yet)
+/* Mod auto indentification by default (doesnt work yet)
 chrome.runtime.onInstalled.addListener(function () {
     console.log('Startup default setting');
     // Update checkmarks and perform other actions
@@ -47,7 +47,9 @@ chrome.runtime.onInstalled.addListener(function () {
 
    
   });
-
+  
+  
+*/
 
 
 
