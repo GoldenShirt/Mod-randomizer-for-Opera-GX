@@ -1,6 +1,7 @@
 document.addEventListener('DOMContentLoaded', function() {
   var extensionList = document.getElementById('extensionList');
   var randomizeButton = document.getElementById('randomizeButton');
+  var toggleAutoModIdentification = document.getElementById('toggleAutoModIdentification');
 
   chrome.management.getAll(function(extensions) {
     chrome.storage.local.get('modExtensionIds', function(result) {
@@ -38,12 +39,8 @@ document.addEventListener('DOMContentLoaded', function() {
     chrome.storage.local.set({ modExtensionIds: modExtensionIds }, function() {
       // Send a message to the background script
       console.log({ type: 'modExtensionsSaved', data: modExtensionIds });
-		window.close(); //Disable this line when changing the code.
+      window.close(); // Disable this line when changing the code.
     });
-	
-	
-	
-	
   });
 
   randomizeButton.addEventListener('click', function() {
@@ -66,4 +63,49 @@ document.addEventListener('DOMContentLoaded', function() {
       }, 100);
     }
   });
+
+
+
+
+ // Add this code to save the state of the "Automatic Mod Identification" checkbox to local storage
+toggleAutoModIdentification.addEventListener('change', function() {
+  if (toggleAutoModIdentification.checked) {
+    // Perform the automatic identification of "mod" extensions
+    identifyModExtensions();
+    // Save the state of the checkbox to local storage
+    chrome.storage.local.set({ autoModIdentificationChecked: true });
+  } else {
+    chrome.storage.local.set({ autoModIdentificationChecked: false });
+  }
+});
+
+ // Retrieve the saved state of the "Automatic Mod Identification" checkbox when the popup is opened
+chrome.storage.local.get('autoModIdentificationChecked', function(result) {
+  toggleAutoModIdentification.checked = result.autoModIdentificationChecked || false;
+  if (toggleAutoModIdentification.checked) {
+    identifyModExtensions();
+  }
+});
+
+
+ // Function to automatically identify "mod" extensions
+  function identifyModExtensions() {
+    // Retrieve the list of all installed extensions
+    chrome.management.getAll(function(extensions) {
+      // Filter the extensions to identify the "mod" extensions based on the updateUrl
+      var modExtensions = extensions.filter(function(extension) {
+        return extension.updateUrl === "https://api.gx.me/store/mods/update";
+      });
+
+      // Display or use the identified "mod" extensions as needed
+      console.log('Identified Mod Extensions:', modExtensions);
+      // You can further process or display the identified "mod" extensions based on your requirements
+    });
+  }
+  
+  
+  
+  
+  
+  
 });
