@@ -2,8 +2,14 @@ chrome.runtime.onInstalled.addListener(function () {
   // Set initial value for modExtensionIds in storage
   chrome.storage.local.set({ modExtensionIds: [] }, function () {
     console.log('Mod Randomizer: Extension installed. Initializing settings.');
+	
+
   });
 });
+
+
+
+
 
 
 
