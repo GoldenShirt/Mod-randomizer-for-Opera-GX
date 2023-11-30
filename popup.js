@@ -74,7 +74,7 @@ modForm.addEventListener('submit', function(event) {
   chrome.storage.local.set({ modExtensionIds: modExtensionIds }, function() {
     // Send a message to the background script
     console.log({ type: 'modExtensionsSaved', data: modExtensionIds });
-    window.close();  Disable this line when changing the code.
+    window.close();  //Disable this line when changing the code.
   });
 });
 
