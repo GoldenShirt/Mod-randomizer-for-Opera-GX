@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Mod randomizer",
-  "description": "Mark automatic mods identification, this will switch enabled mods randomly on Opera startup." ,
-  "version": "1.9",
+  "description": "Automatically identifies mods, and enables only one of them while disabling all other mods" ,
+  "version": "2.0",
   "permissions": [
     "management",
     "storage"

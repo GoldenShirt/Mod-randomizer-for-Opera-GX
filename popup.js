@@ -1,14 +1,15 @@
 document.addEventListener('DOMContentLoaded', function() {
-  var extensionList = document.getElementById('extensionList');
+var extensionList = document.getElementById('extensionList');
 var randomizeButton = document.getElementById('randomizeButton');
 var toggleAutoModIdentification = document.getElementById('toggleAutoModIdentification');
+var toggleRandomizeOnStartupChecked = document.getElementById('toggleRandomizeOnStartup');
 
 chrome.management.getAll(function(extensions) {
   chrome.storage.local.get('modExtensionIds', function(result) {
     var retrievedModExtensionIds = result.modExtensionIds || [];
 
     extensions.forEach(function(extension) {
-      if (extension.id !== 'toggleAutoModIdentification') { // Skip the toggleAutoModIdentification extension
+      if (extension.id !== 'toggleAutoModIdentification' && extension.id !== 'toggleRandomizeOnStartupChecked') { // Skip the toggleAutoModIdentification button and toggleRandomizeOnStartupChecked button
         var checkbox = document.createElement('input');
         checkbox.type = 'checkbox';
         checkbox.id = extension.id;
@@ -29,28 +30,20 @@ chrome.management.getAll(function(extensions) {
 
 
 
+toggleRandomizeOnStartup.addEventListener('change', function () {
+    var randomizeOnStartup = toggleRandomizeOnStartupChecked.checked;
+    console.log('Checkbox changed to:', randomizeOnStartup);
+    chrome.storage.local.set({ toggleRandomizeOnStartupChecked: randomizeOnStartup , randomizeOnStartup: randomizeOnStartup});
+
+    console.log('Randomize on startup is saved as ', randomizeOnStartup);
+});
 
 
-
-
-/* Mod auto indentification by default (doesnt work yet)
-chrome.runtime.onInstalled.addListener(function () {
-    console.log('Startup default setting');
-    // Update checkmarks and perform other actions
-    chrome.storage.local.set({ autoModIdentificationChecked: true }, function () {
-      var clickEvent = new Event('change');
-      toggleAutoModIdentification.dispatchEvent(clickEvent);
-      identifyModExtensions();
-
-     
-    });
-
+chrome.storage.local.get('toggleRandomizeOnStartupChecked', function (result) {
+    console.log('Randomize startup: Retrieved from local storage:', result.toggleRandomizeOnStartupChecked);
+    toggleRandomizeOnStartupChecked.checked = result.toggleRandomizeOnStartupChecked || false;
    
-  });
-  
-  
-*/
-
+});
 
 
 
@@ -64,7 +57,8 @@ modForm.addEventListener('submit', function(event) {
   var checkboxes = document.querySelectorAll('input[type="checkbox"]');
   var modExtensionIds = Array.from(checkboxes)
     .filter(function(checkbox) {
-      return checkbox.checked && checkbox.id !== 'toggleAutoModIdentification'; // Exclude the toggleAutoModIdentification checkbox
+      // Exclude both "toggleAutoModIdentification" and "toggleRandomizeOnStartup" checkboxes
+      return checkbox.checked && checkbox.id !== 'toggleAutoModIdentification' && checkbox.id !== 'toggleRandomizeOnStartup';
     })
     .map(function(checkbox) {
       return checkbox.id;
@@ -74,44 +68,72 @@ modForm.addEventListener('submit', function(event) {
   chrome.storage.local.set({ modExtensionIds: modExtensionIds }, function() {
     // Send a message to the background script
     console.log({ type: 'modExtensionsSaved', data: modExtensionIds });
-    window.close();  //Disable this line when changing the code.
+    window.close();  // Disable this line when changing the code.
   });
 });
 
 
 
+
   //Randomize button
 
-  randomizeButton.addEventListener('click', function() {
-    var checkboxes = document.querySelectorAll('input[type="checkbox"]');
-    var checkedModExtensions = Array.from(checkboxes).filter(function(checkbox) {
-      return checkbox.checked;
+randomizeButton.addEventListener('click', function() {
+ 
+
+  var extensionCheckboxes = document.querySelectorAll('input[type="checkbox"]:not(#toggleRandomizeOnStartup):not(#toggleRandomizeOnStartupChecked):not(#toggleAutoModIdentification)');
+  var checkedExtensions = Array.from(extensionCheckboxes).filter(function(checkbox) {
+    return checkbox.checked;
+  });
+
+  console.log('Checked Extensions:', checkedExtensions);
+
+  if (checkedExtensions.length > 0) {
+    // Disable all MOD extensions
+    checkedExtensions.forEach(function(extension) {
+      chrome.management.setEnabled(extension.id, false).then(function() {
+        console.log('Disabled Extension:', extension.id);
+      }).catch(function(error) {
+        console.error('Failed to disable extension:', extension.id, error);
+      });
     });
 
-    if (checkedModExtensions.length > 0) {
-      // Disable all MOD extensions
-      checkedModExtensions.forEach(function(extension) {
-        chrome.management.setEnabled(extension.id, false);
-      });
+    // Choose a random MOD extension and enable it
+    var randomIndex = Math.floor(Math.random() * checkedExtensions.length);
+    var randomExtension = checkedExtensions[randomIndex];
 
-      // Choose a random MOD extension and enable it
-      var randomIndex = Math.floor(Math.random() * checkedModExtensions.length);
-      var randomExtension = checkedModExtensions[randomIndex];
-      setTimeout(function() {
-        chrome.management.setEnabled(randomExtension.id, true);
-      }, 100);
-    }
-  });
+    setTimeout(function() {
+      chrome.management.setEnabled(randomExtension.id, true).then(function() {
+        console.log('Enabled Random Extension:', randomExtension.id);
+      }).catch(function(error) {
+        console.error('Failed to enable random extension:', randomExtension.id, error);
+      });
+    }, 100);
+  }
+});
+
+
+
+
+
   
   
-  
+
  // Function to update checkboxes based on extension IDs
 function updateCheckboxes(modExtensionIds) {
   var checkboxes = document.querySelectorAll('input[type="checkbox"]');
   checkboxes.forEach(function (checkbox) {
-    checkbox.checked = modExtensionIds.includes(checkbox.id);
+    // Exclude checkboxes with specific IDs
+    if (checkbox.id !== 'toggleRandomizeOnStartup' && checkbox.id !== 'toggleAutoModIdentification') {
+      checkbox.checked = modExtensionIds.includes(checkbox.id);
+      //Logs to make sure which checkboxes its updating.	console.log('Checkbox ID:', checkbox.id, 'Updated:', checkbox.checked);
+    }
   });
 }
+
+
+
+
+
 
 // Function to automatically identify "mod" extensions and update the checkbox states.
 function identifyModExtensions() {
