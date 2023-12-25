@@ -2,7 +2,7 @@ let randomizeOnStartup;
 chrome.runtime.onInstalled.addListener(function () {
   // Set initial value for modExtensionIds in storage
   randomizeOnStartup = true;
-  chrome.storage.local.set({ modExtensionIds: [], randomizeOnStartup: randomizeOnStartup , autoModIdentificationChecked: true}, function () {
+  chrome.storage.local.set({ modExtensionIds: [], randomizeOnStartup: randomizeOnStartup ,toggleRandomizeOnStartupChecked: randomizeOnStartup, autoModIdentificationChecked: true}, function () {
     console.log('Mod Randomizer: Extension installed. Initializing settings. randomizeOnStartup is set to ', randomizeOnStartup, ' autoModIdentification is set to ' , true);
   });
 });
@@ -23,10 +23,6 @@ function runStartupLogic() {
     // Use the global variable instead of declaring a new one
     randomizeOnStartup = result.randomizeOnStartup;
     console.log('Result startup setting overiding default: set to ', result.randomizeOnStartup);
-
-    
-
-  
 
     if (randomizeOnStartup === true) {
 		
