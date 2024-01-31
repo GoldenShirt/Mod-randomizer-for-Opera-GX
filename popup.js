@@ -92,7 +92,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Save the mod extension IDs to local storage
     chrome.storage.local.set({ modExtensionIds: modExtensionIds }, function() {
       // Send a message to the background script
-      console.log({ type: 'modExtensionsSaved', data: modExtensionIds });
+      console.log('Save button: modExtensionsSaved', modExtensionIds );
       window.close();  // Comment out this line when changing the code.
     });
   }
@@ -142,7 +142,7 @@ document.addEventListener('DOMContentLoaded', function() {
       updateCheckboxes(extensions, modExtensionIds);
 
       chrome.storage.local.set({ modExtensionIds: modExtensionIds }, function () {
-        console.log({ type: 'Mod Identification- modExtensionsSaved', data: modExtensionIds });
+        console.log('Automatic Mod Identification: modExtensionsSaved', modExtensionIds );
         
       });
     });
