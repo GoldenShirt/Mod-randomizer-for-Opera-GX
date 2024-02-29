@@ -1,43 +1,44 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="stylesheet" href="popup.css" />
-  </head>
-  <body>
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <!-- Container for the entire popup content -->
+  <div class="popup-container">
     <h2>Mod Randomizer</h2>
-    
- 
 
-<form id="modForm">
-  <!-- Add a wrapper for the "Automatic Mod Identification" button -->
-  <div class="auto-identification-container">
-    <label>
-      <input type="checkbox" id="toggleRandomizeOnStartup" />
-      Randomize on OperaGX startup
-    </label>
-    <label>
-      <input type="checkbox" id="toggleAutoModIdentification" />
-      Automatic Mod Identification
-    </label>
-    <button id="randomizeButton" type="button">Randomize</button>
+    <form id="modForm">
+      <!-- Wrapper for the "Automatic Mod Identification" button -->
+      <div class="auto-identification-container">
+        <label>
+          <input type="checkbox" id="toggleRandomizeOnStartup" />
+          Randomize on OperaGX startup
+        </label>
+        <label>
+          <input type="checkbox" id="toggleAutoModIdentification" />
+          Automatic Mod Identification
+        </label>
+        <button id="randomizeButton" type="button">Randomize</button>
+      </div>
+      
+      <!-- Title for the "Mods" section -->
+      <h3>Mods (advanced) - Disable Automatic Mod Identification to edit</h3>
+
+      <!-- Container for the list of extensions -->
+      <div id="extensionList"></div>
+
+      <!-- Container for buttons -->
+      <div class="button-container">
+        <button id="saveButton" type="submit">Save</button>
+      </div>
+    </form>
   </div>
-  
-  <!-- Add title right under the line that separates the "Randomize" button -->
-  <h3>Mods (advanced) - Disable Automatic Mod Identification to edit</h3>
 
-  <div id="extensionList"></div>
-
-  <div class="button-container">
-    <button id="saveButton" type="submit">Save</button>
-  </div>
-</form>
-
-
-
-
-    <script src="popup.js"></script>
-  </body>
+  <!-- Include the JavaScript file at the end of the body -->
+  <script src="popup.js"></script>
+</body>
 </html>
