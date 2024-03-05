@@ -2,10 +2,11 @@
   "manifest_version": 3,
   "name": "Mod randomizer",
   "description": "Randomly enables a mod and disables other mods. Can automatically identify mods." ,
-  "version": "2.4",
+  "version": "2.5",
   "permissions": [
     "management",
-    "storage" 
+    "storage" ,
+	"tabs"
   ],
 
 "host_permissions": [

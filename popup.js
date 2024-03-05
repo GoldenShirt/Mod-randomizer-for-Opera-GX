@@ -150,6 +150,8 @@ function disableAndEnableRandomExtension(modExtensionIds) {
       const { id, name, enabled } = extension;
       chrome.management.setEnabled(randomExtensionId, true, () => {
         console.log('Enabled Random Extension:', { id, name, enabled });
+		// Open the link opera://mods to enable the checkmarks back manually
+        chrome.tabs.create({ url: 'opera://mods' });
       });
     });
   }, 100);
