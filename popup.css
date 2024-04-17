@@ -56,10 +56,10 @@ input[type="checkbox"]:checked {
 }
 
 #randomizeButton {
-  margin-top: -5px; /* Keep the same margin for the top */
-  margin-bottom: -3px; /* Lower margin for the bottom */
-  height: 45px; /* Adjust the height as needed */
-  width: 100%; /* Make the button take the full width */
+  margin-top: -5px;
+  margin-bottom: -3px;
+  height: 45px;
+  width: 100%;
   padding: 8px;
   border: 1px solid #ccc;
   border-radius: 3px;
@@ -68,6 +68,23 @@ input[type="checkbox"]:checked {
   cursor: pointer;
 }
 
+#message {
+  font-size: 18px; /* Set the font size to 18 pixels */
+  margin: 10px 0; /* Add some margin for spacing */
+}
+.redirect-message {
+  font-size: 16px;
+  color: #007bff; /* Adjust the color as needed */
+}
+
+
+/* Style for the separator line */
+hr {
+  border: none;
+  height: 1px;
+  background-color: #ccc;
+  margin: 20px 0;
+}
 
 #extensionList {
   margin-bottom: 20px;
@@ -81,12 +98,11 @@ input[type="checkbox"]:checked {
   padding-top: 10px;
 }
 
-
 #saveButton {
-  margin-top: -5px; /* Adjust the margin-top for the button as needed */
-  padding: 12px; /* Adjust the padding as needed */
-  height: 45px; /* Adjust the height as needed */
-  width: 100%; /* Make the button take the full width */
+  margin-top: -5px;
+  padding: 12px;
+  height: 45px;
+  width: 100%;
   border: 1px solid #ccc;
   border-radius: 3px;
   background-color: #007bff;
@@ -94,18 +110,18 @@ input[type="checkbox"]:checked {
   cursor: pointer;
 }
 
-
 .auto-identification-container {
   margin-bottom: 20px;
   border-bottom: 1px solid #ccc;
   padding-bottom: 10px;
 }
 
-
 h3 {
   margin: -10px 0;
   margin-bottom: 15px;
   font-size: 16px;
-  color: #333; /* Choose your preferred color */
+  color: #333;
   text-align: center;
 }
+
+

@@ -131,7 +131,7 @@ document.addEventListener('DOMContentLoaded', function () {
 }
 
 
-  // Function to disable and enable a random extension
+// Function to disable and enable a random extension
 function disableAndEnableRandomExtension(modExtensionIds) {
   modExtensionIds.forEach(extensionId => {
     chrome.management.get(extensionId, extension => {
@@ -150,11 +150,49 @@ function disableAndEnableRandomExtension(modExtensionIds) {
       const { id, name, enabled } = extension;
       chrome.management.setEnabled(randomExtensionId, true, () => {
         console.log('Enabled Random Extension:', { id, name, enabled });
-		// Open the link opera://mods to enable the checkmarks back manually
-        chrome.tabs.create({ url: 'opera://mods' });
+
+        // Display message to the user on the popup
+        const messageElement = document.getElementById('message');
+        messageElement.textContent = `Enabled Mod: ${name}`;
+
+        // Create the hr element if not found
+        let hrElement = document.querySelector('hr');
+        if (!hrElement) {
+          hrElement = document.createElement('hr');
+          // Append it after the message element
+          messageElement.insertAdjacentElement('afterend', hrElement);
+        }
+
+        // Create and show message "Redirecting to enable checkmarks..." with animation
+        const redirectMessageElement = document.createElement('p');
+        redirectMessageElement.textContent = 'Redirecting to enable checkmarks';
+        redirectMessageElement.classList.add('redirect-message');
+        // Insert it before the hr element
+        hrElement.insertAdjacentElement('beforebegin', redirectMessageElement);
+
+        // Show message "Redirecting to enable checkmarks..." with animation
+        let dots = '';
+        const interval = setInterval(() => {
+          redirectMessageElement.textContent = `Redirecting to enable checkmarks${dots}`;
+          dots += '.';
+          if (dots.length > 3) {
+            dots = '.';
+          }
+        }, 500); // Change the interval (milliseconds) as needed
+
+        // Open the link opera://mods after 5 seconds
+        setTimeout(() => {
+          clearInterval(interval); // Stop the animation
+          chrome.tabs.create({ url: 'opera://mods' });
+        }, 5000);
       });
     });
   }, 100);
 }
+
+
+
+
+
 
 });
