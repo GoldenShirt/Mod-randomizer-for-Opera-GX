@@ -1,6 +1,7 @@
 body {
   width: 20rem;
-  color: #fff; /* Set text color to white */
+  background-color: #f5f5f5; /* Light background */
+  color: #333; /* Dark text color */
 }
 
 ul {
@@ -14,20 +15,17 @@ li {
 }
 
 li:nth-child(odd) {
-  background: #80808030;
+  background: #80808030; /* Light gray background for odd items */
 }
 
 li:nth-child(even) {
-  background: #ffffff;
+  background: #ffffff; /* White background for even items */
 }
-
-
 
 label {
   display: block;
   margin-bottom: 10px;
   vertical-align: middle;
-  color: #fff; /* Set text color to white */
 }
 
 input[type="checkbox"],
@@ -37,7 +35,7 @@ button {
   -moz-appearance: none;
   outline: none;
   vertical-align: middle;
-    cursor: pointer;
+  cursor: pointer;
 }
 
 input[type="checkbox"] {
@@ -48,11 +46,11 @@ input[type="checkbox"] {
   height: 30px;
   border: 1px solid #ccc;
   border-radius: 3px;
-  background-color: #fff;
+  background-color: #fff; /* White background */
 }
 
 input[type="checkbox"]:checked {
-  background-color: #007bff;
+  background-color: #007bff; /* Dark blue background for checked checkboxes */
 }
 
 #randomizeButton {
@@ -63,23 +61,21 @@ input[type="checkbox"]:checked {
   padding: 8px;
   border: 1px solid #ccc;
   border-radius: 3px;
-  background-color: #007bff;
-  color: #fff;
+  background-color: #007bff; /* Dark blue background */
+  color: #fff; /* White text color */
   cursor: pointer;
 }
 
 #message {
   font-size: 18px;
   margin: 10px 0;
-  color: #00c7ff; /* Set text color to white */
+  color: #00c7ff; /* Light blue text color */
 }
 .redirect-message {
   font-size: 16px;
-  color: #00c7ff;
+  color: #00c7ff; /* Light blue text color */
 }
 
-
-/* Style for the separator line */
 hr {
   border: none;
   height: 1px;
@@ -106,8 +102,8 @@ hr {
   width: 100%;
   border: 1px solid #ccc;
   border-radius: 3px;
-  background-color: #007bff;
-  color: #fff;
+  background-color: #007bff; /* Dark blue background */
+  color: #fff; /* White text color */
   cursor: pointer;
 }
 
@@ -121,6 +117,6 @@ h3 {
   margin: -10px 0;
   margin-bottom: 15px;
   font-size: 16px;
-  color: #007bff;
+  color: #007bff; /* Dark blue text color */
   text-align: center;
 }
