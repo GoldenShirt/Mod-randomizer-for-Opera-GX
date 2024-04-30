@@ -93,7 +93,7 @@ document.addEventListener('DOMContentLoaded', function () {
   // Function to handle "Automatic Mod Identification" checkbox change
   function handleAutoModIdentificationChange() {
     chrome.storage.local.set({ autoModIdentificationChecked: toggleAutoModIdentification.checked });
-
+	console.log('Automatic Mod Identification set to ' , toggleAutoModIdentification.checked);
     if (toggleAutoModIdentification.checked) {
       identifyModExtensions();
     } else {
@@ -105,7 +105,7 @@ document.addEventListener('DOMContentLoaded', function () {
   function handleRandomizeOnStartupChange() {
     const randomizeOnStartup = toggleRandomizeOnStartupChecked.checked;
     chrome.storage.local.set({ toggleRandomizeOnStartupChecked: randomizeOnStartup, randomizeOnStartup });
-    console.log('Randomize on startup is saved as ', randomizeOnStartup);
+    console.log('Randomize on startup is set to ', randomizeOnStartup);
   }
 
   // Function to automatically identify mod extensions and save them

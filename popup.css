@@ -1,5 +1,6 @@
 body {
   width: 20rem;
+  color: #fff; /* Set text color to white */
 }
 
 ul {
@@ -20,15 +21,13 @@ li:nth-child(even) {
   background: #ffffff;
 }
 
-h3,
-p {
-  margin: 0;
-}
+
 
 label {
   display: block;
   margin-bottom: 10px;
   vertical-align: middle;
+  color: #fff; /* Set text color to white */
 }
 
 input[type="checkbox"],
@@ -38,14 +37,15 @@ button {
   -moz-appearance: none;
   outline: none;
   vertical-align: middle;
+    cursor: pointer;
 }
 
 input[type="checkbox"] {
   margin-right: 8px;
   position: relative;
   top: -1px;
-  width: 24px;
-  height: 24px;
+  width: 30px;
+  height: 30px;
   border: 1px solid #ccc;
   border-radius: 3px;
   background-color: #fff;
@@ -57,7 +57,7 @@ input[type="checkbox"]:checked {
 
 #randomizeButton {
   margin-top: -5px;
-  margin-bottom: -3px;
+  margin-bottom: -4px;
   height: 45px;
   width: 100%;
   padding: 8px;
@@ -69,12 +69,13 @@ input[type="checkbox"]:checked {
 }
 
 #message {
-  font-size: 18px; /* Set the font size to 18 pixels */
-  margin: 10px 0; /* Add some margin for spacing */
+  font-size: 18px;
+  margin: 10px 0;
+  color: #00c7ff; /* Set text color to white */
 }
 .redirect-message {
   font-size: 16px;
-  color: #007bff; /* Adjust the color as needed */
+  color: #00c7ff;
 }
 
 
@@ -120,8 +121,6 @@ h3 {
   margin: -10px 0;
   margin-bottom: 15px;
   font-size: 16px;
-  color: #333;
+  color: #007bff;
   text-align: center;
 }
-
-
