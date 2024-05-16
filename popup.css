@@ -1,7 +1,8 @@
+/* Light mode (default) */
 body {
   width: 20rem;
-  background-color: #f5f5f5; /* Light background */
-  color: #333; /* Dark text color */
+  background-color: #f5f5f5;
+  color: #333;
 }
 
 ul {
@@ -15,11 +16,11 @@ li {
 }
 
 li:nth-child(odd) {
-  background: #80808030; /* Light gray background for odd items */
+  background: #e0e0e0; /* Slightly darker background for odd items */
 }
 
 li:nth-child(even) {
-  background: #ffffff; /* White background for even items */
+  background: #ffffff;
 }
 
 label {
@@ -31,8 +32,6 @@ label {
 input[type="checkbox"],
 button {
   appearance: none;
-  -webkit-appearance: none;
-  -moz-appearance: none;
   outline: none;
   vertical-align: middle;
   cursor: pointer;
@@ -46,11 +45,11 @@ input[type="checkbox"] {
   height: 30px;
   border: 1px solid #ccc;
   border-radius: 3px;
-  background-color: #fff; /* White background */
+  background-color: #fff;
 }
 
 input[type="checkbox"]:checked {
-  background-color: #007bff; /* Dark blue background for checked checkboxes */
+  background-color: #007bff;
 }
 
 #randomizeButton {
@@ -61,19 +60,20 @@ input[type="checkbox"]:checked {
   padding: 8px;
   border: 1px solid #ccc;
   border-radius: 3px;
-  background-color: #007bff; /* Dark blue background */
-  color: #fff; /* White text color */
+  background-color: #007bff;
+  color: #fff;
   cursor: pointer;
 }
 
 #message {
   font-size: 18px;
   margin: 10px 0;
-  color: #00c7ff; /* Light blue text color */
+  color: #0056b3; /* Darker blue for better readability */
 }
+
 .redirect-message {
   font-size: 16px;
-  color: #00c7ff; /* Light blue text color */
+  color: #0056b3; /* Darker blue for better readability */
 }
 
 hr {
@@ -102,8 +102,8 @@ hr {
   width: 100%;
   border: 1px solid #ccc;
   border-radius: 3px;
-  background-color: #007bff; /* Dark blue background */
-  color: #fff; /* White text color */
+  background-color: #007bff;
+  color: #fff;
   cursor: pointer;
 }
 
@@ -117,6 +117,56 @@ h3 {
   margin: -10px 0;
   margin-bottom: 15px;
   font-size: 16px;
-  color: #007bff; /* Dark blue text color */
+  color: #007bff;
   text-align: center;
+}
+
+/* Dark mode */
+@media (prefers-color-scheme: dark) {
+  body {
+    background-color: #1e1e1e;
+    color: #f5f5f5;
+  }
+
+  li:nth-child(odd) {
+    background: #333333;
+  }
+
+  li:nth-child(even) {
+    background: #2e2e2e;
+  }
+
+  input[type="checkbox"] {
+    border: 1px solid #666;
+    background-color: #2e2e2e;
+  }
+
+  input[type="checkbox"]:checked {
+    background-color: #007bff;
+  }
+
+  #randomizeButton {
+    border: 1px solid #666;
+    background-color: #007bff;
+    color: #f5f5f5;
+  }
+
+  #message,
+  .redirect-message {
+    color: #00c7ff;
+  }
+
+  hr {
+    background-color: #444;
+  }
+
+  #saveButton {
+    border: 1px solid #666;
+    background-color: #007bff;
+    color: #f5f5f5;
+  }
+
+  h3 {
+    color: #00c7ff;
+  }
 }
