@@ -8,4 +8,4 @@ Just click on randomize, and you're done. You can manually switch mods like this
 You can customize which mods will be disabled and enabled.
 If you want this extension to not disable some of the mods it detected, disable the automatic mod identification, and then uncheck the undesired mods and save.
 
-(Disclaimer: I only know very basic coding so most of this was made by Aria, yes the AI.)
+(Disclaimer: I only know very basic coding so most of this was made by ChatGPT)
