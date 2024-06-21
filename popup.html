@@ -11,14 +11,28 @@
   <div class="popup-container">
     <h2>Mod Randomizer</h2>
     <form id="modForm">
-      <div class="auto-identification-container">
-        <label><input type="checkbox" id="toggleRandomizeOnStartup" /> Randomize on OperaGX startup</label>
-        <label><input type="checkbox" id="toggleAutoModIdentification" /> Automatic Mod Identification</label>
-        <button id="randomizeButton" type="button">Randomize</button>
+      <div class="option-container">
+        <label class="switch-label">
+          <span>Randomize on OperaGX startup</span>
+          <label class="switch">
+            <input type="checkbox" id="toggleRandomizeOnStartup">
+            <span class="slider"></span>
+          </label>
+        </label>
+        <label class="switch-label">
+          <span>Automatic Mod Identification</span>
+          <label class="switch">
+            <input type="checkbox" id="toggleAutoModIdentification">
+            <span class="slider"></span>
+          </label>
+        </label>
       </div>
+      <button id="randomizeButton" type="button">Randomize</button>
+      <hr>
       <div id="message"></div>
       <h3>Mods (advanced) - Disable Automatic Mod Identification to edit</h3>
-      <div id="extensionList"></div>
+      <ul id="extensionList"></ul>
+      <hr>
       <div class="button-container">
         <button id="saveButton" type="submit">Save</button>
       </div>

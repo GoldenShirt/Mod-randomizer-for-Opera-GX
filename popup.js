@@ -157,47 +157,72 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log(`${action}: ${extension.name}`);
   }
 
-  function showEnabledMessage(extension) {
+function showEnabledMessage(extension) {
+    const messageElement = document.getElementById('message');
+
+    // Clear any previous messages and hr elements
+    removeRedirectMessage();
+    removePreviousHr();
+
+    // Create the message and add hr below it
     messageElement.innerHTML = `Enabled Mod: <span class="mod-name">${extension.name}</span>`;
     messageElement.classList.add('highlighted-message');
+
+    // Add hr after the message
+    let hrElement = document.createElement('hr');
+    hrElement.id = 'message-hr';
+    messageElement.insertAdjacentElement('afterend', hrElement);
+
     addRedirectMessage();
     redirectTimeout = setTimeout(() => {
-      chrome.tabs.create({ url: 'opera://mods' });
-    }, 5000); // Assign timeout to redirectTimeout
-  }
+        chrome.tabs.create({ url: 'opera://mods' });
+    }, 5000);
+}
 
-  function addRedirectMessage() {
-    let hrElement = document.querySelector('hr');
-    if (!hrElement) {
-      hrElement = document.createElement('hr');
-      messageElement.insertAdjacentElement('afterend', hrElement);
-    }
+function addRedirectMessage() {
+    const messageElement = document.getElementById('message');
+    const hrElement = document.getElementById('message-hr');
 
     const redirectMessageElement = document.createElement('p');
     redirectMessageElement.textContent = 'Redirecting to enable checkmarks';
     redirectMessageElement.classList.add('redirect-message');
+
+    // Insert the redirect message before the hr element
     hrElement.insertAdjacentElement('beforebegin', redirectMessageElement);
 
     animateRedirectMessage(redirectMessageElement);
-  }
+}
 
-  function removeRedirectMessage() {
+function removeRedirectMessage() {
     const redirectMessageElements = document.querySelectorAll('.redirect-message');
     redirectMessageElements.forEach(element => element.remove());
-  }
 
-  function animateRedirectMessage(element) {
+    removePreviousHr();
+}
+
+function removePreviousHr() {
+    const hrElement = document.querySelector('#message-hr');
+    if (hrElement) hrElement.remove();
+}
+
+function animateRedirectMessage(element) {
     let dots = '';
     const interval = setInterval(() => {
-      element.textContent = `Redirecting to enable checkmarks${dots}`;
-      dots += '.';
-      if (dots.length > 3) {
-        dots = '.';
-      }
+        element.textContent = `Redirecting to enable checkmarks${dots}`;
+        dots += '.';
+        if (dots.length > 3) {
+            dots = '.';
+        }
     }, 500);
 
     setTimeout(() => {
-      clearInterval(interval);
+        clearInterval(interval);
     }, 5000);
-  }
+}
+
+
+
+
+
+
 });
