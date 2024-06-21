@@ -5,8 +5,7 @@
   "version": "3.1",
   "permissions": [
     "management",
-    "storage",
-    "tabs"
+    "storage"
   ],
   "host_permissions": [
     "https://api.gx.me/store/mods/update"
