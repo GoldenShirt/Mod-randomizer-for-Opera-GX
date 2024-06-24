@@ -11,6 +11,16 @@ body {
   padding: 1rem;
 }
 
+#randomizeButton {
+  margin-top: -3px;
+  margin-bottom: -14px;
+}
+
+#saveButton {
+margin-top: -15px;
+margin-bottom: -17px;
+}
+
 .option-container {
   font-size: 0.97rem;
 }
@@ -92,8 +102,8 @@ input[type="checkbox"]:disabled {
   cursor: not-allowed;
 }
 
-#saveButton {
-  margin-top: -25px;
+button {
+  margin-top: -10px;
   padding: 10px;
   border: 2px solid #ccc;
   border-radius: 5px;
@@ -105,8 +115,9 @@ input[type="checkbox"]:disabled {
   cursor: pointer;
 }
 
-#saveButton:hover {
+button:hover {
   background-color: #0056b3;
+  border-color: #0056b3;
 }
 
 .switch-label {
@@ -168,24 +179,6 @@ input:checked + .slider:before {
 }
 
 .switch:hover .slider {
-  background-color: #b3b3b3;
-}
-
-#randomizeButton {
-  color: #fff;
-  margin-top: -3px;
-  margin-bottom: -14px;
-  padding: 10px;
-  border: 2px solid #ccc;
-  background-color: #007bff;
-  color: #fff;
-  font-weight: 500;
-  border-radius: 5px;
-  width: 100%;
-  height: 45px;
-}
-
-#randomizeButton:hover {
   background-color: #0056b3;
 }
 
@@ -224,12 +217,12 @@ hr {
   display: flex;
   flex-direction: column;
   margin-top: 10px;
-  padding-top: 10px;
+  padding-top: 0px; /* Adjusted padding */
 }
 
 .auto-identification-container {
   margin-bottom: 10px;
-  padding-bottom: 10px;
+  padding-bottom: 0px; /* Adjusted padding */
 }
 
 h3 {
@@ -272,13 +265,13 @@ h3 {
     background-color: #0056b3; /* Darker blue for checked items */
   }
 
-  #saveButton {
+  button {
     background-color: #007bff;
     color: #e0e0e0;
     border: 2px solid #444;
   }
 
-  #saveButton:hover {
+  button:hover {
     background-color: #0056b3;
     border-color: #0056b3;
   }
@@ -304,16 +297,6 @@ h3 {
   }
 
   .switch:hover .slider {
-    background-color: #777777;
-  }
-
-  #randomizeButton {
-    border: 1px solid #666;
-    background-color: #007bff;
-    color: #f5f5f5;
-  }
-
-  #randomizeButton:hover {
     background-color: #0056b3;
   }
 
