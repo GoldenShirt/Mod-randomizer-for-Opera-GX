@@ -6,8 +6,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const modForm = document.getElementById('modForm');
   const messageElement = document.getElementById('message');
 
-  let randomizeTimeout; // Declare randomizeTimeout at the appropriate scope level
-  let redirectTimeout; // Declare redirectTimeout for handling redirection
+  let randomizeTimeout;
+  let redirectTimeout;
 
   addEventListeners();
   initializeCheckboxStates();
@@ -37,29 +37,30 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function updateCheckboxes() {
     chrome.management.getAll(extensions => {
-      chrome.storage.local.get('modExtensionIds', ({ modExtensionIds = [] }) => {
+      chrome.storage.local.get(['modExtensionIds', 'autoModIdentificationChecked'], ({ modExtensionIds = [], autoModIdentificationChecked }) => {
         extensionList.innerHTML = '';
         extensions
           .sort((a, b) => a.name.localeCompare(b.name))
           .filter(extension => !['toggleAutoModIdentification', 'toggleRandomizeOnStartup'].includes(extension.id))
           .forEach(extension => {
-            const label = createCheckboxLabel(extension, modExtensionIds.includes(extension.id));
-            extensionList.appendChild(label);
+            const li = createCheckboxListItem(extension, modExtensionIds.includes(extension.id), autoModIdentificationChecked);
+            extensionList.appendChild(li);
           });
       });
     });
   }
 
-  function createCheckboxLabel(extension, isChecked) {
-    const label = document.createElement('label');
+  function createCheckboxListItem(extension, isChecked, autoModIdentificationChecked) {
+    const li = document.createElement('li');
     const checkbox = document.createElement('input');
     checkbox.type = 'checkbox';
     checkbox.id = extension.id;
     checkbox.checked = isChecked;
+    checkbox.disabled = autoModIdentificationChecked; // Disable checkbox based on setting
 
-    label.appendChild(checkbox);
-    label.appendChild(document.createTextNode(extension.name));
-    return label;
+    li.appendChild(checkbox);
+    li.appendChild(document.createTextNode(extension.name));
+    return li;
   }
 
   function handleFormSubmission(event) {
@@ -157,29 +158,26 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log(`${action}: ${extension.name}`);
   }
 
-function showEnabledMessage(extension) {
+  function showEnabledMessage(extension) {
     const messageElement = document.getElementById('message');
 
-    // Clear any previous messages and hr elements
     removeRedirectMessage();
     removePreviousHr();
 
-    // Create the message and add hr below it
     messageElement.innerHTML = `Enabled Mod: <span class="mod-name">${extension.name}</span>`;
     messageElement.classList.add('highlighted-message');
 
-    // Add hr after the message
     let hrElement = document.createElement('hr');
     hrElement.id = 'message-hr';
     messageElement.insertAdjacentElement('afterend', hrElement);
 
     addRedirectMessage();
     redirectTimeout = setTimeout(() => {
-        chrome.tabs.create({ url: 'opera://mods' });
+      chrome.tabs.create({ url: 'opera://mods' });
     }, 5000);
-}
+  }
 
-function addRedirectMessage() {
+  function addRedirectMessage() {
     const messageElement = document.getElementById('message');
     const hrElement = document.getElementById('message-hr');
 
@@ -187,42 +185,28 @@ function addRedirectMessage() {
     redirectMessageElement.textContent = 'Redirecting to enable checkmarks';
     redirectMessageElement.classList.add('redirect-message');
 
-    // Insert the redirect message before the hr element
     hrElement.insertAdjacentElement('beforebegin', redirectMessageElement);
 
     animateRedirectMessage(redirectMessageElement);
-}
+  }
 
-function removeRedirectMessage() {
+  function removeRedirectMessage() {
     const redirectMessageElements = document.querySelectorAll('.redirect-message');
     redirectMessageElements.forEach(element => element.remove());
 
     removePreviousHr();
-}
+  }
 
-function removePreviousHr() {
+  function removePreviousHr() {
     const hrElement = document.querySelector('#message-hr');
     if (hrElement) hrElement.remove();
-}
+  }
 
-function animateRedirectMessage(element) {
+  function animateRedirectMessage(element) {
     let dots = '';
-    const interval = setInterval(() => {
-        element.textContent = `Redirecting to enable checkmarks${dots}`;
-        dots += '.';
-        if (dots.length > 3) {
-            dots = '.';
-        }
-    }, 500);
-
-    setTimeout(() => {
-        clearInterval(interval);
-    }, 5000);
-}
-
-
-
-
-
-
+    setInterval(() => {
+      dots = dots.length < 3 ? dots + '.' : '';
+      element.textContent = `Redirecting to enable checkmarks${dots}`;
+    }, 300);
+  }
 });

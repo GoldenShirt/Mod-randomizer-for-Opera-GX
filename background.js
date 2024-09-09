@@ -1,3 +1,4 @@
+// Background script for the extension
 chrome.runtime.onInstalled.addListener(() => {
   // Set initial values for extension settings in storage
   const initialSettings = {
@@ -30,28 +31,32 @@ function handleModExtensions(modExtensionIds) {
     // Filter for mod extensions based on stored IDs
     const modExtensions = extensions.filter(extension => modExtensionIds.includes(extension.id));
 
-    console.log('Mod Randomizer: Startup detected. Mod Extensions retrieved and identified:', modExtensions);
+    console.log('Mod Randomizer: Mod Extensions retrieved:', modExtensions);
 
     if (modExtensions.length > 0) {
-      // Randomly select a mod extension
-      const randomIndex = Math.floor(Math.random() * modExtensions.length);
-      const selectedExtension = modExtensions[randomIndex];
-      console.log('Mod Randomizer: Randomly selected mod extension:', selectedExtension);
-
-      // Disable all mod extensions except the randomly selected one
+      // Disable all mod extensions
       modExtensions.forEach(extension => {
-        if (extension.id !== selectedExtension.id) {
+        if (extension.enabled) {
           chrome.management.setEnabled(extension.id, false, () => {
             logExtensionState('Disabled Extension', extension);
           });
         }
       });
 
-      // Enable the randomly selected mod extension
-      if (!selectedExtension.enabled) {
+      // Select a mod randomly that is currently disabled
+      const disabledMods = modExtensions.filter(extension => !extension.enabled);
+
+      if (disabledMods.length > 0) {
+        const randomIndex = Math.floor(Math.random() * disabledMods.length);
+        const selectedExtension = disabledMods[randomIndex];
+        console.log('Mod Randomizer: Randomly selected mod extension:', selectedExtension);
+
+        // Enable the randomly selected mod extension
         chrome.management.setEnabled(selectedExtension.id, true, () => {
           logExtensionState('Enabled selected mod extension', selectedExtension);
         });
+      } else {
+        console.log('Mod Randomizer: No disabled mods to enable.');
       }
     }
   });
