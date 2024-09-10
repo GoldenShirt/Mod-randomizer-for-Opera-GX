@@ -1,6 +1,4 @@
-// Background script for the extension
 chrome.runtime.onInstalled.addListener(() => {
-  // Set initial values for extension settings in storage
   const initialSettings = {
     modExtensionIds: [],
     toggleRandomizeOnStartupChecked: true,
@@ -9,61 +7,146 @@ chrome.runtime.onInstalled.addListener(() => {
 
   chrome.storage.local.set(initialSettings, () => {
     console.log('Mod Randomizer: Extension installed. Initializing settings.', initialSettings);
+	identifyModExtensions();
   });
 });
 
 chrome.runtime.onStartup.addListener(runStartupLogic);
 
-// Function to execute startup logic
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  const { action } = message;
+
+  switch (action) {
+    case 'identifyModExtensions':
+      identifyModExtensions();
+      sendResponse({ status: 'success' });
+      break;
+    case 'saveModExtensionIds':
+      saveModExtensionIds(message.modExtensionIds);
+      sendResponse({ status: 'success' });
+      break;
+    case 'randomizeMods':
+      runRandomization((selectedExtension, modExtensionIds) => {
+        if (selectedExtension) {
+          sendResponse({
+            status: 'success',
+            enabledExtension: selectedExtension,
+            modExtensionIds: modExtensionIds
+          });
+        } else {
+          sendResponse({
+            status: 'error',
+            message: 'No mod extensions were enabled.'
+          });
+        }
+      });
+      break;
+    case 'getExtensions':
+      sendExtensionsData(sendResponse);
+      break;
+    default:
+      console.error('Unknown action:', action);
+      sendResponse({ status: 'error', message: 'Unknown action' });
+  }
+
+  return true; // Required for async responses
+});
+
 function runStartupLogic() {
   chrome.storage.local.get(['toggleRandomizeOnStartupChecked', 'modExtensionIds'], ({ toggleRandomizeOnStartupChecked, modExtensionIds = [] }) => {
-    console.log('Startup setting: Randomize on startup is set to', toggleRandomizeOnStartupChecked);
-
     if (toggleRandomizeOnStartupChecked) {
       handleModExtensions(modExtensionIds);
     }
   });
 }
 
-// Function to handle enabling/disabling mod extensions
-function handleModExtensions(modExtensionIds) {
+function identifyModExtensions() {
   chrome.management.getAll(extensions => {
-    // Filter for mod extensions based on stored IDs
-    const modExtensions = extensions.filter(extension => modExtensionIds.includes(extension.id));
+    const modExtensionIds = extensions
+      .filter(extension => extension.updateUrl === 'https://api.gx.me/store/mods/update')
+      .map(extension => extension.id);
 
-    console.log('Mod Randomizer: Mod Extensions retrieved:', modExtensions);
+    chrome.storage.local.set({ modExtensionIds }, () => {
+      console.log('Mod extensions identified:', modExtensionIds);
+    });
+  });
+}
 
-    if (modExtensions.length > 0) {
-      // Disable all mod extensions
-      modExtensions.forEach(extension => {
-        if (extension.enabled) {
-          chrome.management.setEnabled(extension.id, false, () => {
-            logExtensionState('Disabled Extension', extension);
-          });
-        }
-      });
+function saveModExtensionIds(modExtensionIds) {
+  chrome.storage.local.set({ modExtensionIds }, () => {
+    console.log('Mod extensions saved:', modExtensionIds);
+  });
+}
 
-      // Select a mod randomly that is currently disabled
-      const disabledMods = modExtensions.filter(extension => !extension.enabled);
-
-      if (disabledMods.length > 0) {
-        const randomIndex = Math.floor(Math.random() * disabledMods.length);
-        const selectedExtension = disabledMods[randomIndex];
-        console.log('Mod Randomizer: Randomly selected mod extension:', selectedExtension);
-
-        // Enable the randomly selected mod extension
-        chrome.management.setEnabled(selectedExtension.id, true, () => {
-          logExtensionState('Enabled selected mod extension', selectedExtension);
-        });
-      } else {
-        console.log('Mod Randomizer: No disabled mods to enable.');
-      }
+// Adjust runRandomization to take a callback that sends the enabled extension details
+function runRandomization(callback) {
+  chrome.storage.local.get('modExtensionIds', ({ modExtensionIds }) => {
+    if (modExtensionIds && modExtensionIds.length > 0) {
+      handleModExtensions(modExtensionIds, callback);
+    } else {
+      console.error('Error: Mod extensions not found in local storage');
+      callback(null, modExtensionIds); // Pass null to indicate an error, along with modExtensionIds
     }
   });
 }
 
-// Function to log the state of extensions
+function handleModExtensions(modExtensionIds, callback) {
+  chrome.storage.local.get(['lastEnabledModId'], ({ lastEnabledModId }) => {
+    chrome.management.getAll(extensions => {
+      const modExtensions = extensions.filter(extension => modExtensionIds.includes(extension.id));
+      if (modExtensions.length > 0) {
+        modExtensions.forEach(extension => {
+          if (extension.enabled) {
+            chrome.management.setEnabled(extension.id, false, () => {
+              logExtensionState('Disabled Extension', extension);
+            });
+          }
+        });
+        
+        let disabledMods = modExtensions.filter(extension => !extension.enabled);
+        
+        // Remove the last enabled mod from the list of options
+        if (lastEnabledModId) {
+          disabledMods = disabledMods.filter(mod => mod.id !== lastEnabledModId);
+        }
+        
+        if (disabledMods.length > 0) {
+          const randomIndex = Math.floor(Math.random() * disabledMods.length);
+          const selectedExtension = disabledMods[randomIndex];
+          chrome.management.setEnabled(selectedExtension.id, true, () => {
+            logExtensionState('Enabled selected mod extension', selectedExtension);
+            
+            // Save the newly enabled mod's ID
+            chrome.storage.local.set({ lastEnabledModId: selectedExtension.id }, () => {
+              if (callback) {
+                callback(selectedExtension, modExtensionIds);
+              }
+            });
+          });
+        } else {
+          console.log('Mod Randomizer: No disabled mods to enable (excluding last enabled).');
+          if (callback) {
+            callback(null, modExtensionIds);
+          }
+        }
+      } else {
+        console.log('Mod Randomizer: No mod extensions found.');
+        if (callback) {
+          callback(null, modExtensionIds);
+        }
+      }
+    });
+  });
+}
+
+function sendExtensionsData(sendResponse) {
+  chrome.storage.local.get(['modExtensionIds', 'autoModIdentificationChecked'], ({ modExtensionIds = [], autoModIdentificationChecked }) => {
+    chrome.management.getAll(extensions => {
+      sendResponse({ extensions, modExtensionIds, autoModIdentificationChecked });
+    });
+  });
+}
+
 function logExtensionState(action, extension) {
-  const { id, name, enabled } = extension;
-  console.log(action, { id, name, enabled });
+  console.log(`${action}:`, { id: extension.id, name: extension.name, enabled: extension.enabled });
 }
