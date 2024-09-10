@@ -5,8 +5,27 @@ body {
   color: #333;
   padding: 0rem;
   font-family: 'Arial', sans-serif;
+  overflow-y: auto; /* Enable vertical scrolling */
+}
+/* Scrollbar styles for Opera GX */
+::-webkit-scrollbar {
+  width: 14px; /* Increased width for better visibility */
 }
 
+::-webkit-scrollbar-track {
+  background: #e0e0e0;
+  border-radius: 7px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 7px;
+  border: 3px solid #e0e0e0; /* Adjusted border for the wider scrollbar */
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
 .popup-container {
   padding: 1rem;
 }
@@ -241,6 +260,19 @@ margin-top: -13px;
   body {
     background-color: #1e1e1e;
     color: #f5f5f5;
+  }
+   /* Dark mode scrollbar styles */
+  ::-webkit-scrollbar-track {
+    background: #2e2e2e;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #555;
+    border: 3px solid #2e2e2e; /* Adjusted border for the wider scrollbar in dark mode */
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #777;
   }
 
   li:nth-child(1n) {
