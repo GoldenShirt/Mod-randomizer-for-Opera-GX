@@ -29,22 +29,22 @@ document.addEventListener('DOMContentLoaded', () => {
     );
   }
 
-  function handleCheckboxChange(key, value) {
-    chrome.storage.local.set({ [key]: value }, () => {
-      console.log(`${key} set to ${value}`);
-      if (key === 'autoModIdentificationChecked') {
-        if (value) {
-          sendMessageToBackground('identifyModExtensions');
-        }
-        // Update all checkboxes immediately
-        const checkboxes = document.querySelectorAll('#extensionList input[type="checkbox"]');
-        checkboxes.forEach(checkbox => {
-          checkbox.disabled = value;
-        });
-      }
-    });
-  }
-
+ function handleCheckboxChange(key, value) {
+   chrome.storage.local.set({ [key]: value }, () => {
+     console.log(`${key} set to ${value}`);
+     if (key === 'autoModIdentificationChecked') {
+       if (value) {
+         sendMessageToBackground('identifyModExtensions');
+       }
+       // Update all checkboxes immediately
+       const checkboxes = document.querySelectorAll('#extensionList input[type="checkbox"]');
+       checkboxes.forEach(checkbox => {
+         checkbox.disabled = value;
+       });
+       updateCheckboxes();  // Ensure checkboxes are updated when the setting is turned off
+     }
+   });
+ }
   function handleExtensionListChange() {
     if (toggleAutoModIdentification.checked) {
       alert('Auto Mod Identification is currently enabled.');
