@@ -156,7 +156,7 @@ function handleRandomizeButtonClick() {
     
     addRedirectMessage();
     redirectTimeout = setTimeout(() => {
-        chrome.tabs.create({ url: 'opera://mods' });
+        chrome.tabs.create({ url: 'opera://mods/manage' });
         removeRedirectMessage();
     }, 5000);
 }
