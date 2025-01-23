@@ -7,6 +7,7 @@ body {
   font-family: 'Arial', sans-serif;
   overflow-y: auto; /* Enable vertical scrolling */
 }
+
 /* Scrollbar styles for Opera GX */
 ::-webkit-scrollbar {
   width: 14px; /* Increased width for better visibility */
@@ -26,6 +27,7 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #555;
 }
+
 .popup-container {
   padding: 1rem;
 }
@@ -33,11 +35,6 @@ body {
 #randomizeButton {
   margin-top: -3px;
   margin-bottom: -14px;
-}
-
-#saveButton {
-margin-top: -15px;
-margin-bottom: -17px;
 }
 
 .option-container {
@@ -70,12 +67,9 @@ li:nth-child(1n) {
   background: #e0e0e0;
 }
 
-
-
 li:not(:has(input[type="checkbox"]:disabled)):hover {
    background: #d0d0d0;
 }
- 
 
 label {
   display: block;
@@ -231,13 +225,6 @@ hr {
   margin-bottom: 20px;
 }
 
-.button-container {
-  display: flex;
-  flex-direction: column;
-  margin-top: 10px;
-  padding-top: 0px; /* Adjusted padding */
-}
-
 .auto-identification-container {
   margin-bottom: 10px;
   padding-bottom: 0px; /* Adjusted padding */
@@ -249,10 +236,6 @@ h3 {
   font-size: 16px;
   color: #007bff;
   text-align: center;
-}
-
-#lowest {
-margin-top: -13px;
 }
 
 /* Dark mode */
@@ -280,12 +263,10 @@ margin-top: -13px;
   }
 
 li:not(:has(input[type="checkbox"]:disabled)):hover {
-  background: #444444 ; 
+  background: #444444 ;
 }
 
- 
-
-  input[type="checkbox"] {
+ input[type="checkbox"] {
     border: 1px solid #666;
     background-color: #2e2e2e;
   }
@@ -348,9 +329,6 @@ li:not(:has(input[type="checkbox"]:disabled)):hover {
   .redirect-message {
     color: #007bff;
   }
-#lowest {
-margin-top: -13px;
-}
 
   hr {
     background-color: #444;

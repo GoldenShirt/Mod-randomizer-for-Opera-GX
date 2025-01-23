@@ -14,7 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function addEventListeners() {
     toggleAutoModIdentification.addEventListener('change', () => handleCheckboxChange('autoModIdentificationChecked', toggleAutoModIdentification.checked));
     toggleRandomizeOnStartup.addEventListener('change', () => handleCheckboxChange('toggleRandomizeOnStartupChecked', toggleRandomizeOnStartup.checked));
-    modForm.addEventListener('submit', handleFormSubmission);
+    extensionList.addEventListener('change', handleExtensionListChange);
     randomizeButton.addEventListener('click', () => handleRandomizeButtonClick());
   }
 
@@ -30,34 +30,22 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function handleCheckboxChange(key, value) {
-  chrome.storage.local.set({ [key]: value }, () => {
-    console.log(`${key} set to ${value}`);
-    if (key === 'autoModIdentificationChecked') {
-      if (value) {
-        sendMessageToBackground('identifyModExtensions');
+    chrome.storage.local.set({ [key]: value }, () => {
+      console.log(`${key} set to ${value}`);
+      if (key === 'autoModIdentificationChecked') {
+        if (value) {
+          sendMessageToBackground('identifyModExtensions');
+        }
+        // Update all checkboxes immediately
+        const checkboxes = document.querySelectorAll('#extensionList input[type="checkbox"]');
+        checkboxes.forEach(checkbox => {
+          checkbox.disabled = value;
+        });
       }
-      // Update all checkboxes immediately
-      const checkboxes = document.querySelectorAll('#extensionList input[type="checkbox"]');
-      checkboxes.forEach(checkbox => {
-        checkbox.disabled = value;
-      });
-    }
-  });
-}
-
-
-function handleRandomizeButtonClick() {
-    sendMessageToBackground('randomizeMods');
-	 if (randomizeTimeout) {
-      clearTimeout(randomizeTimeout);
-    }
-    if (redirectTimeout) {
-      clearTimeout(redirectTimeout);
-    }
-    removeRedirectMessage();
+    });
   }
-  function handleFormSubmission(event) {
-    event.preventDefault();
+
+  function handleExtensionListChange() {
     if (toggleAutoModIdentification.checked) {
       alert('Auto Mod Identification is currently enabled.');
       return;
@@ -67,9 +55,18 @@ function handleRandomizeButtonClick() {
       .filter(id => !['toggleAutoModIdentification', 'toggleRandomizeOnStartup'].includes(id));
 
     sendMessageToBackground('saveModExtensionIds', { modExtensionIds });
-	 window.close();
   }
-  
+
+  function handleRandomizeButtonClick() {
+    sendMessageToBackground('randomizeMods');
+    if (randomizeTimeout) {
+      clearTimeout(randomizeTimeout);
+    }
+    if (redirectTimeout) {
+      clearTimeout(redirectTimeout);
+    }
+    removeRedirectMessage();
+  }
 
   function updateCheckboxes() {
     chrome.runtime.sendMessage({ action: 'getExtensions' }, ({ extensions, modExtensionIds, autoModIdentificationChecked }) => {
