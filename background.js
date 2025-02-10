@@ -18,8 +18,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     switch (action) {
         case 'identifyModExtensions':
-            identifyModExtensions();
-            sendResponse({ status: 'success' });
+            identifyModExtensions((modExtensionIds) => {
+                sendResponse({ status: 'success', modExtensionIds });
+            });
             break;
         case 'saveModExtensionIds':
             saveModExtensionIds(message.modExtensionIds);
@@ -68,17 +69,18 @@ function runStartupLogic() {
     });
 }
 
-function identifyModExtensions() {
+function identifyModExtensions(callback) {
     chrome.management.getAll(extensions => {
         const modExtensionIds = extensions
             .filter(extension => extension.updateUrl === 'https://api.gx.me/store/mods/update')
             .map(extension => extension.id);
-
         chrome.storage.local.set({ modExtensionIds }, () => {
             console.log('Mod extensions identified:', modExtensionIds);
+            if (callback) callback(modExtensionIds);
         });
     });
 }
+
 
 function saveModExtensionIds(modExtensionIds) {
     chrome.storage.local.set({ modExtensionIds }, () => {

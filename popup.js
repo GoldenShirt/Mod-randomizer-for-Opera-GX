@@ -31,25 +31,6 @@ document.addEventListener('DOMContentLoaded', () => {
         );
     }
 
-    function handleCheckboxChange(key, value) {
-        chrome.storage.local.set({ [key]: value }, () => {
-            console.log(`${key} set to ${value}`);
-            if (key === 'autoModIdentificationChecked') {
-                if (value) {
-                    sendMessageToBackground('identifyModExtensions');
-                }
-                // Update all checkboxes immediately
-                const checkboxes = document.querySelectorAll('#extensionList input[type="checkbox"]');
-                checkboxes.forEach(checkbox => {
-                    checkbox.disabled = value;
-                });
-                updateCheckboxes(() => {
-                    // Reapply the current search filter after updating the mod list
-                    handleSearchInput();
-                });
-            }
-        });
-    }
 
     function handleExtensionListChange() {
         if (toggleAutoModIdentification.checked) {
@@ -64,7 +45,18 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function handleRandomizeButtonClick() {
-        sendMessageToBackground('randomizeMods');
+        sendMessageToBackground('randomizeMods', {}, (response) => {
+            if (response && response.status === 'success') {
+                const enabledExtension = response.enabledExtension;
+                if (enabledExtension) {
+                    showEnabledMessage(enabledExtension);
+                } else {
+                    console.error('No extension was enabled.');
+                }
+            } else if (response && response.status === 'error') {
+                console.error(response.message);
+            }
+        });
         if (randomizeTimeout) {
             clearTimeout(randomizeTimeout);
         }
@@ -74,14 +66,16 @@ document.addEventListener('DOMContentLoaded', () => {
         removeRedirectMessage();
     }
 
+
     function handleSearchInput() {
-        const query = searchBar.value;
-        chrome.runtime.sendMessage({ action: 'SEARCH_QUERY', query: query }, function (response) {
-            if (response && response.extensions) {
-                updateExtensionList(response.extensions);
-            }
-        });
-    }
+    const query = searchBar.value.toLowerCase();
+    const listItems = extensionList.getElementsByTagName('li');
+    Array.from(listItems).forEach(li => {
+        const text = li.textContent.toLowerCase();
+        li.style.display = text.includes(query) ? '' : 'none';
+    });
+}
+
 
     function updateCheckboxes(callback) {
         chrome.runtime.sendMessage({ action: 'getExtensions' }, ({ extensions, modExtensionIds, autoModIdentificationChecked }) => {
@@ -121,27 +115,43 @@ document.addEventListener('DOMContentLoaded', () => {
         return li;
     }
 
-    function sendMessageToBackground(action, data = {}) {
+    // popup.js
+    function sendMessageToBackground(action, data = {}, callback) {
         chrome.runtime.sendMessage({ action, ...data }, (response) => {
             if (chrome.runtime.lastError) {
                 console.error(chrome.runtime.lastError);
             } else {
                 console.log(`Background response: ${response.status}`);
-                if (response.status === 'success' && action === 'randomizeMods') {
-                    const enabledExtension = response.enabledExtension;
-                    const modExtensionIds = response.modExtensionIds || []; // Handle potential undefined
-
-                    if (enabledExtension) {
-                        showEnabledMessage(enabledExtension); // Update the UI with the enabled extension
-                    } else {
-                        console.error('No extension was enabled.');
-                    }
-                } else if (response.status === 'error') {
-                    console.error(response.message);
-                }
+                if (callback) callback(response);
             }
         });
     }
+
+    function handleCheckboxChange(key, value) {
+        chrome.storage.local.set({ [key]: value }, () => {
+            console.log(`${key} set to ${value}`);
+            if (key === 'autoModIdentificationChecked') {
+                if (value) {
+                    sendMessageToBackground('identifyModExtensions', {}, (response) => {
+                        updateCheckboxes(() => {
+                            // Reapply the current search filter after updating
+                            handleSearchInput();
+                        });
+                    });
+                } else {
+                    updateCheckboxes(() => {
+                        handleSearchInput();
+                    });
+                }
+                // Disable/enable checkboxes immediately
+                const checkboxes = document.querySelectorAll('#extensionList input[type="checkbox"]');
+                checkboxes.forEach(checkbox => {
+                    checkbox.disabled = value;
+                });
+            }
+        });
+    }
+
 
     function addRedirectMessage() {
         const messageElement = document.getElementById('message');

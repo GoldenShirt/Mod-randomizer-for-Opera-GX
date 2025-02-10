@@ -10,23 +10,24 @@ body {
 
 /* Scrollbar styles for Opera GX */
 ::-webkit-scrollbar {
-    width: 14px; /* Increased width for better visibility */
+    width: 14px;
 }
 
 ::-webkit-scrollbar-track {
-    background: #e0e0e0;
+    background: #dcdcdc; /* A lighter, more neutral track */
     border-radius: 7px;
 }
 
 ::-webkit-scrollbar-thumb {
-    background: #888;
+    background: #a6a6a6; /* A softer thumb shade */
     border-radius: 7px;
-    border: 3px solid #e0e0e0; /* Adjusted border for the wider scrollbar */
+    border: 3px solid #dcdcdc; /* Matching border for a cohesive look */
 }
 
     ::-webkit-scrollbar-thumb:hover {
-        background: #555;
+        background: #888; /* Slightly darker on hover */
     }
+
 
 .popup-container {
     padding: 1rem; /* Increased padding */
@@ -79,7 +80,7 @@ li {
 }
 
     li:nth-child(1n) {
-        background: #d3d3d3;
+        background: #e6e6e6;
     }
 
     li:not(:has(input[type="checkbox"]:disabled)):hover {
@@ -254,7 +255,7 @@ h3 {
 }
 
 .advanced-section {
-    background-color: #e0e0e0; /* Subtle gray background */
+    background-color: #f0f0f0; /* Subtle gray background */
     padding: 1rem;
     border-radius: 5px;
     margin-top: -1rem;
@@ -294,9 +295,7 @@ h3 {
         ::-webkit-scrollbar-thumb:hover {
             background: #777;
         }
-    .advanced-section {
-        background-color: #f0f0f0; /* Subtle gray background */
-    }
+    
     li:nth-child(1n) {
         background: #333333;
     }
