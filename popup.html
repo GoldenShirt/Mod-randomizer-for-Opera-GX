@@ -1,39 +1,42 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <link rel="stylesheet" href="popup.css" />
-  <title>Mod Randomizer</title>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="popup.css" />
+    <title>Mod Randomizer</title>
 </head>
 <body>
-  <div class="popup-container">
-    <h2>Mod Randomizer</h2>
-    <form id="modForm">
-      <div class="option-container">
-        <label class="switch-label">
-          <span>Randomize on OperaGX startup</span>
-          <label class="switch">
-            <input type="checkbox" id="toggleRandomizeOnStartup">
-            <span class="slider"></span>
-          </label>
-        </label>
-        <label class="switch-label">
-          <span>Automatic Mod Identification</span>
-          <label class="switch">
-            <input type="checkbox" id="toggleAutoModIdentification">
-            <span class="slider"></span>
-          </label>
-        </label>
-      </div>
-      <button id="randomizeButton" type="button">Randomize</button>
-      <hr>
-      <div id="message"></div>
-      <h3>Mods (advanced) - Disable Automatic Mod Identification to edit</h3>
-      <ul id="extensionList"></ul>
-    </form>
-  </div>
-  <script src="popup.js"></script>
+    <div class="popup-container">
+        <h2>Mod Randomizer</h2>
+        <form id="modForm">
+            <div class="option-container">
+                <label class="switch-label">
+                    <span>Randomize on OperaGX startup</span>
+                    <label class="switch">
+                        <input type="checkbox" id="toggleRandomizeOnStartup">
+                        <span class="slider"></span>
+                    </label>
+                </label>
+                <label class="switch-label">
+                    <span>Automatic Mod Identification</span>
+                    <label class="switch">
+                        <input type="checkbox" id="toggleAutoModIdentification">
+                        <span class="slider"></span>
+                    </label>
+                </label>
+            </div>
+            <button id="randomizeButton" type="button">Randomize</button>
+            <hr>
+            <div id="message"></div>
+            <div class="advanced-section">
+                <h3>Manual Mod Selection - Disable Automatic Mod Identification to edit</h3>
+                <input type="text" id="searchBar" placeholder="Search mods...">
+                <ul id="extensionList"></ul>
+            </div>
+        </form>
+    </div>
+    <script src="popup.js"></script>
 </body>
 </html>
