@@ -279,6 +279,9 @@ h3 {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    margin-top: 19px;
+    width: 100%;
+    margin-bottom: -14px;
 }
 
     .time-setting-container input {
@@ -286,7 +289,9 @@ h3 {
         padding: 0.5rem;
         border: 1px solid #ccc;
         border-radius: 5px;
+        height: 30px;
     }
+
 
 /* Dark mode */
 @media (prefers-color-scheme: dark) {
