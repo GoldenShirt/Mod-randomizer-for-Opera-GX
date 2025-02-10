@@ -1,4 +1,5 @@
-let randomizeTimeout; // Will hold our recurring interval
+let redirectTimeout = null; // NEW: To track redirection timer
+let randomizeTimeout; // For recurring randomization
 
 chrome.runtime.onInstalled.addListener(() => {
     const initialSettings = {
@@ -83,7 +84,8 @@ chrome.storage.onChanged.addListener((changes, area) => {
 });
 
 function runStartupLogic() {
-    chrome.storage.local.get(['toggleRandomizeOnStartupChecked', 'modExtensionIds', 'toggleOpenModsTabChecked'],
+    chrome.storage.local.get(
+        ['toggleRandomizeOnStartupChecked', 'modExtensionIds', 'toggleOpenModsTabChecked'],
         ({ toggleRandomizeOnStartupChecked, modExtensionIds = [], toggleOpenModsTabChecked }) => {
             if (toggleRandomizeOnStartupChecked) {
                 handleModExtensions(modExtensionIds, () => {
@@ -129,8 +131,13 @@ function runRandomization(callback) {
                     // Always schedule redirection after 5 seconds if the setting is on.
                     chrome.storage.local.get('toggleOpenModsTabChecked', ({ toggleOpenModsTabChecked }) => {
                         if (toggleOpenModsTabChecked) {
-                            setTimeout(() => {
+                            // Reset the redirection timer if it already exists.
+                            if (redirectTimeout) {
+                                clearTimeout(redirectTimeout);
+                            }
+                            redirectTimeout = setTimeout(() => {
                                 chrome.tabs.create({ url: 'opera://mods/manage' });
+                                redirectTimeout = null;
                             }, 5000);
                         }
                     });
@@ -191,8 +198,22 @@ function sendExtensionsData(sendResponse) {
 
 function setRandomizeTime(time) {
     const parsedTime = parseFloat(time);
-    if (isNaN(parsedTime) || parsedTime < 0.25) {
-        console.error(`Randomize time must be at least 0.25 minutes (15 seconds). Given: ${time}`);
+    if (isNaN(parsedTime)) {
+        console.log(`Randomize time is not a number. Given: ${time}. No interval scheduled.`);
+        return;
+    }
+    if (parsedTime === 0) {
+        chrome.storage.local.set({ randomizeTime: parsedTime }, () => {
+            console.log(`Randomize time set to 0 minutes. Timer disabled.`);
+            if (randomizeTimeout) {
+                clearInterval(randomizeTimeout);
+                randomizeTimeout = null;
+            }
+        });
+        return;
+    }
+    if (parsedTime < 0.25) {
+        console.log(`Randomize time must be at least 0.25 minutes (15 seconds) or 0 to disable. Given: ${time}. No interval scheduled.`);
         return;
     }
     chrome.storage.local.set({ randomizeTime: parsedTime }, () => {
@@ -208,7 +229,7 @@ function setRandomizeTime(time) {
                         if (selectedExtension) {
                             console.log('Randomization completed successfully.');
                         } else {
-                            console.error('Randomization failed.');
+                            console.log('Randomization failed.');
                         }
                     });
                 }, parsedTime * 60000);
@@ -216,3 +237,5 @@ function setRandomizeTime(time) {
         });
     });
 }
+
+

@@ -103,17 +103,23 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- FIX: Use alert for error if time < 0.25 ---
     function handleTimeInputChange() {
         const time = parseFloat(timeInput.value);
-        if (isNaN(time)) {
+
+        if (isNaN(time) || time === 0 || time === '') {
+            // Treat empty input as 0  
             messageElement.textContent = '';
+            sendMessageToBackground('setRandomizeTime', { time: 0 });
             return;
         }
+
         if (time < 0.25) {
-            alert('Randomize time must be at least 0.25 minutes (15 seconds).');
+            alert('Randomize time must be at least 0.25 minutes (15 seconds) or 0 to disable.');
             return;
         }
+
         messageElement.textContent = '';
         sendMessageToBackground('setRandomizeTime', { time });
     }
+
 
     function updateCheckboxes(callback) {
         chrome.runtime.sendMessage({ action: 'getExtensions' }, ({ extensions, modExtensionIds, autoModIdentificationChecked }) => {
