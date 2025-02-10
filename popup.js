@@ -9,27 +9,50 @@ document.addEventListener('DOMContentLoaded', () => {
     const modForm = document.getElementById('modForm');
     const messageElement = document.getElementById('message');
     const searchBar = document.getElementById('searchBar');
-    let randomizeTimeout;
     let redirectTimeout;
+
+    // Prevent default form submission when pressing Enter.
+    modForm.addEventListener('submit', (e) => e.preventDefault());
 
     addEventListeners();
     initializeCheckboxStates();
 
     function addEventListeners() {
-        toggleAutoModIdentification.addEventListener('change', () => handleCheckboxChange('autoModIdentificationChecked', toggleAutoModIdentification.checked));
-        toggleRandomizeOnStartup.addEventListener('change', () => handleCheckboxChange('toggleRandomizeOnStartupChecked', toggleRandomizeOnStartup.checked));
-        toggleOpenModsTab.addEventListener('change', () => handleCheckboxChange('toggleOpenModsTabChecked', toggleOpenModsTab.checked));
-        toggleRandomizeOnSetTime.addEventListener('change', () => handleCheckboxChange('toggleRandomizeOnSetTimeChecked', toggleRandomizeOnSetTime.checked));
-        timeInput.addEventListener('input', handleTimeInputChange);
+        toggleAutoModIdentification.addEventListener('change', () =>
+            handleCheckboxChange('autoModIdentificationChecked', toggleAutoModIdentification.checked)
+        );
+        toggleRandomizeOnStartup.addEventListener('change', () =>
+            handleCheckboxChange('toggleRandomizeOnStartupChecked', toggleRandomizeOnStartup.checked)
+        );
+        toggleOpenModsTab.addEventListener('change', () =>
+            handleCheckboxChange('toggleOpenModsTabChecked', toggleOpenModsTab.checked)
+        );
+        toggleRandomizeOnSetTime.addEventListener('change', () =>
+            handleCheckboxChange('toggleRandomizeOnSetTimeChecked', toggleRandomizeOnSetTime.checked)
+        );
+        // Use "change" to trigger once the value is set.
+        timeInput.addEventListener('change', handleTimeInputChange);
         extensionList.addEventListener('change', handleExtensionListChange);
-        randomizeButton.addEventListener('click', () => handleRandomizeButtonClick());
+        randomizeButton.addEventListener('click', handleRandomizeButtonClick);
         searchBar.addEventListener('input', handleSearchInput);
     }
 
     function initializeCheckboxStates() {
         chrome.storage.local.get(
-            ['autoModIdentificationChecked', 'toggleRandomizeOnStartupChecked', 'toggleOpenModsTabChecked', 'toggleRandomizeOnSetTimeChecked', 'randomizeTime'],
-            ({ autoModIdentificationChecked = false, toggleRandomizeOnStartupChecked = false, toggleOpenModsTabChecked = true, toggleRandomizeOnSetTimeChecked = false, randomizeTime = 0 }) => {
+            [
+                'autoModIdentificationChecked',
+                'toggleRandomizeOnStartupChecked',
+                'toggleOpenModsTabChecked',
+                'toggleRandomizeOnSetTimeChecked',
+                'randomizeTime'
+            ],
+            ({
+                autoModIdentificationChecked = false,
+                toggleRandomizeOnStartupChecked = false,
+                toggleOpenModsTabChecked = true,
+                toggleRandomizeOnSetTimeChecked = false,
+                randomizeTime = 0
+            }) => {
                 toggleAutoModIdentification.checked = autoModIdentificationChecked;
                 toggleRandomizeOnStartup.checked = toggleRandomizeOnStartupChecked;
                 toggleOpenModsTab.checked = toggleOpenModsTabChecked;
@@ -47,30 +70,24 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         const modExtensionIds = Array.from(document.querySelectorAll('input[type="checkbox"]:checked'))
             .map(checkbox => checkbox.id)
-            .filter(id => !['toggleAutoModIdentification', 'toggleRandomizeOnStartup', 'toggleOpenModsTab', 'toggleRandomizeOnSetTime'].includes(id));
+            .filter(id =>
+                ![
+                    'toggleAutoModIdentification',
+                    'toggleRandomizeOnStartup',
+                    'toggleOpenModsTab',
+                    'toggleRandomizeOnSetTime'
+                ].includes(id)
+            );
 
         sendMessageToBackground('saveModExtensionIds', { modExtensionIds });
     }
 
     function handleRandomizeButtonClick() {
         sendMessageToBackground('randomizeMods', {}, (response) => {
-            if (response && response.status === 'success') {
-                const enabledExtension = response.enabledExtension;
-                if (enabledExtension) {
-                    showEnabledMessage(enabledExtension);
-                } else {
-                    console.error('No extension was enabled.');
-                }
-            } else if (response && response.status === 'error') {
+            if (response && response.status === 'error') {
                 console.error(response.message);
             }
         });
-        if (randomizeTimeout) {
-            clearTimeout(randomizeTimeout);
-        }
-        if (redirectTimeout) {
-            clearTimeout(redirectTimeout);
-        }
         removeRedirectMessage();
     }
 
@@ -84,10 +101,21 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function handleTimeInputChange() {
-        const time = parseInt(timeInput.value, 10);
-        if (!isNaN(time)) {
-            sendMessageToBackground('setRandomizeTime', { time });
+        const time = parseFloat(timeInput.value);
+        if (isNaN(time)) {
+            messageElement.textContent = '';
+            return;
         }
+        if (time < 0.25) {
+            messageElement.textContent = 'Randomize time must be at least 0.25 minutes (15 seconds).';
+            setTimeout(() => {
+                messageElement.textContent = '';
+            }, 5000);
+            return;
+        }
+        // Clear error and send valid time.
+        messageElement.textContent = '';
+        sendMessageToBackground('setRandomizeTime', { time });
     }
 
     function updateCheckboxes(callback) {
@@ -103,18 +131,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    function updateExtensionList(extensions) {
-        chrome.storage.local.get(['modExtensionIds', 'autoModIdentificationChecked'], ({ modExtensionIds = [], autoModIdentificationChecked }) => {
-            extensionList.innerHTML = '';
-            extensions
-                .sort((a, b) => a.name.localeCompare(b.name))
-                .forEach(extension => {
-                    const li = createCheckboxListItem(extension, modExtensionIds.includes(extension.id), autoModIdentificationChecked);
-                    extensionList.appendChild(li);
-                });
-        });
-    }
-
     function createCheckboxListItem(extension, isChecked, autoModIdentificationChecked) {
         const li = document.createElement('li');
         const checkbox = document.createElement('input');
@@ -122,7 +138,6 @@ document.addEventListener('DOMContentLoaded', () => {
         checkbox.id = extension.id;
         checkbox.checked = isChecked;
         checkbox.disabled = autoModIdentificationChecked;
-
         li.appendChild(checkbox);
         li.appendChild(document.createTextNode(extension.name));
         return li;
@@ -133,7 +148,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (chrome.runtime.lastError) {
                 console.error(chrome.runtime.lastError);
             } else {
-                console.log(`Background response: ${response.status}`);
+                console.log(`Background response: ${response && response.status}`);
                 if (callback) callback(response);
             }
         });
@@ -144,77 +159,66 @@ document.addEventListener('DOMContentLoaded', () => {
             console.log(`${key} set to ${value}`);
             if (key === 'autoModIdentificationChecked') {
                 if (value) {
-                    sendMessageToBackground('identifyModExtensions', {}, (response) => {
-                        updateCheckboxes(() => {
-                            handleSearchInput();
-                        });
-                    });
+                    sendMessageToBackground('identifyModExtensions', {}, () => updateCheckboxes());
                 } else {
-                    updateCheckboxes(() => {
-                        handleSearchInput();
-                    });
+                    updateCheckboxes();
                 }
-                const checkboxes = document.querySelectorAll('#extensionList input[type="checkbox"]');
-                checkboxes.forEach(checkbox => {
+                document.querySelectorAll('#extensionList input[type="checkbox"]').forEach(checkbox => {
                     checkbox.disabled = value;
                 });
             }
         });
     }
 
+    // Create or update the HR element and add the animated redirect message.
     function addRedirectMessage() {
-        const messageElement = document.getElementById('message');
-        const hrElement = document.getElementById('message-hr');
-
-        const redirectMessageElement = document.createElement('p');
-        redirectMessageElement.textContent = 'Redirecting to enable checkmarks';
-        redirectMessageElement.classList.add('redirect-message');
-
-        hrElement.insertAdjacentElement('beforebegin', redirectMessageElement);
-
-        animateRedirectMessage(redirectMessageElement);
-    }
-
-    function animateRedirectMessage(element) {
-        let dots = '';
-        setInterval(() => {
-            dots = dots.length < 3 ? dots + '.' : '';
-            element.textContent = `Redirecting to enable checkmarks${dots}`;
-        }, 300);
-    }
-
-    function showEnabledMessage(extension) {
-        const messageElement = document.getElementById('message');
-        removeRedirectMessage();
-        messageElement.innerHTML = `Enabled Mod: <span class="mod-name">${extension.name}</span>`;
-        messageElement.classList.add('highlighted-message');
-
         let hrElement = document.getElementById('message-hr');
         if (!hrElement) {
             hrElement = document.createElement('hr');
             hrElement.id = 'message-hr';
             messageElement.insertAdjacentElement('afterend', hrElement);
         }
+        const redirectMessageElement = document.createElement('p');
+        redirectMessageElement.textContent = 'Redirecting to enable checkmarks';
+        redirectMessageElement.classList.add('redirect-message');
+        hrElement.insertAdjacentElement('beforebegin', redirectMessageElement);
+        animateRedirectMessage(redirectMessageElement);
+    }
 
-        addRedirectMessage();
-        redirectTimeout = setTimeout(() => {
-            chrome.storage.local.get('toggleOpenModsTabChecked', ({ toggleOpenModsTabChecked }) => {
-                if (toggleOpenModsTabChecked) {
-                    chrome.tabs.create({ url: 'opera://mods/manage' });
-                }
-                removeRedirectMessage();
-            });
-        }, 5000);
+    function animateRedirectMessage(element) {
+        let dots = '';
+        const interval = setInterval(() => {
+            dots = dots.length < 3 ? dots + '.' : '';
+            element.textContent = `Redirecting to enable checkmarks${dots}`;
+        }, 300);
+        element.dataset.intervalId = interval;
+    }
+
+    function showEnabledMessage(extension) {
+        removeRedirectMessage();
+        messageElement.innerHTML = `Enabled Mod: <span class="mod-name">${extension.name}</span>`;
+        chrome.storage.local.get('toggleOpenModsTabChecked', ({ toggleOpenModsTabChecked }) => {
+            if (toggleOpenModsTabChecked) {
+                addRedirectMessage();
+            }
+        });
     }
 
     function removeRedirectMessage() {
-        const redirectMessageElements = document.querySelectorAll('.redirect-message');
-        redirectMessageElements.forEach(element => element.remove());
+        document.querySelectorAll('.redirect-message').forEach(element => {
+            if (element.dataset.intervalId) clearInterval(parseInt(element.dataset.intervalId));
+            element.remove();
+        });
+        const hrElement = document.getElementById('message-hr');
+        if (hrElement) {
+            hrElement.remove();
+        }
     }
 
-    function removePreviousHr() {
-        const hrElement = document.querySelector('#message-hr');
-        if (hrElement) hrElement.remove();
-    }
+    // Listen for background messages (when randomization completes)
+    chrome.runtime.onMessage.addListener((message) => {
+        if (message.action === 'randomizationCompleted') {
+            showEnabledMessage(message.enabledExtension);
+        }
+    });
 });
-
