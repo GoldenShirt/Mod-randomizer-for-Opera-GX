@@ -28,7 +28,6 @@ body {
         background: #888; /* Slightly darker on hover */
     }
 
-
 .popup-container {
     padding: 1rem; /* Increased padding */
 }
@@ -43,7 +42,7 @@ body {
     color: #fff;
     font-weight: 600;
     width: 100%;
-    height: 50px; /* Increased height */
+    height: 60px; /* Increased height */
     cursor: pointer;
 }
 
@@ -86,7 +85,6 @@ li {
     li:hover {
         background: #d0d0d0;
     }
-
 
 label {
     display: block;
@@ -264,10 +262,10 @@ h3 {
     min-height: 0; /* Ensure no minimum height */
 }
 
-
 #extensionList {
     margin-bottom: -10px; /* Adjust the value as needed */
 }
+
 #searchBar {
     width: 100%;
     padding: 0.5rem;
@@ -276,6 +274,19 @@ h3 {
     border-radius: 5px;
     margin-left: -0.5rem; /* Move search bar to the left */
 }
+
+.time-setting-container {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+    .time-setting-container input {
+        width: 100%;
+        padding: 0.5rem;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+    }
 
 /* Dark mode */
 @media (prefers-color-scheme: dark) {
@@ -296,7 +307,7 @@ h3 {
         ::-webkit-scrollbar-thumb:hover {
             background: #777;
         }
-    
+
     li:nth-child(1n) {
         background: #333333;
     }
@@ -304,7 +315,6 @@ h3 {
     li:hover {
         background: #444444;
     }
-
 
     input[type="checkbox"] {
         border: 1px solid #666;
@@ -384,4 +394,16 @@ h3 {
         border: 1px solid #555;
         margin-left: -0.5rem; /* Move search bar to the left */
     }
+    .time-setting-container {
+        margin-top:19px;
+        width: 100%;
+        margin-bottom: -14px;
+    }
+
+        .time-setting-container input {
+            background-color: #333;
+            color: #f5f5f5;
+            border: 1px solid #555;
+            height: 30px;
+        }
 }

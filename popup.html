@@ -13,6 +13,20 @@
         <form id="modForm">
             <div class="option-container">
                 <label class="switch-label">
+                    <span>Automatic Mod Identification</span>
+                    <label class="switch">
+                        <input type="checkbox" id="toggleAutoModIdentification">
+                        <span class="slider"></span>
+                    </label>
+                </label>
+                <label class="switch-label">
+                    <span>Open mods tab</span>
+                    <label class="switch">
+                        <input type="checkbox" id="toggleOpenModsTab">
+                        <span class="slider"></span>
+                    </label>
+                </label>
+                <label class="switch-label">
                     <span>Randomize on OperaGX startup</span>
                     <label class="switch">
                         <input type="checkbox" id="toggleRandomizeOnStartup">
@@ -20,14 +34,17 @@
                     </label>
                 </label>
                 <label class="switch-label">
-                    <span>Automatic Mod Identification</span>
+                    <span>Randomize Mods on Set Time</span>
                     <label class="switch">
-                        <input type="checkbox" id="toggleAutoModIdentification">
+                        <input type="checkbox" id="toggleRandomizeOnSetTime">
                         <span class="slider"></span>
                     </label>
                 </label>
             </div>
             <button id="randomizeButton" type="button">Randomize</button>
+            <div class="time-setting-container">
+                <input type="number" id="timeInput" min="1" placeholder="Enter time in minutes">
+            </div>
             <hr>
             <div id="message"></div>
             <div class="advanced-section">
