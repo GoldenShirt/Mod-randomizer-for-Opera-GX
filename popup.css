@@ -83,9 +83,10 @@ li {
         background: #e6e6e6;
     }
 
-    li:not(:has(input[type="checkbox"]:disabled)):hover {
+    li:hover {
         background: #d0d0d0;
     }
+
 
 label {
     display: block;
@@ -300,9 +301,10 @@ h3 {
         background: #333333;
     }
 
-    li:not(:has(input[type="checkbox"]:disabled)):hover {
+    li:hover {
         background: #444444;
     }
+
 
     input[type="checkbox"] {
         border: 1px solid #666;
