@@ -30,7 +30,7 @@ document.addEventListener('DOMContentLoaded', () => {
         toggleRandomizeOnSetTime.addEventListener('change', () =>
             handleCheckboxChange('toggleRandomizeOnSetTimeChecked', toggleRandomizeOnSetTime.checked)
         );
-        // Use "change" to trigger once the value is set.
+        // Use "change" so we don’t schedule multiple timeouts while typing.
         timeInput.addEventListener('change', handleTimeInputChange);
         extensionList.addEventListener('change', handleExtensionListChange);
         randomizeButton.addEventListener('click', handleRandomizeButtonClick);
@@ -100,6 +100,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // --- FIX: Use alert for error if time < 0.25 ---
     function handleTimeInputChange() {
         const time = parseFloat(timeInput.value);
         if (isNaN(time)) {
@@ -107,13 +108,9 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         if (time < 0.25) {
-            messageElement.textContent = 'Randomize time must be at least 0.25 minutes (15 seconds).';
-            setTimeout(() => {
-                messageElement.textContent = '';
-            }, 5000);
+            alert('Randomize time must be at least 0.25 minutes (15 seconds).');
             return;
         }
-        // Clear error and send valid time.
         messageElement.textContent = '';
         sendMessageToBackground('setRandomizeTime', { time });
     }
@@ -170,14 +167,27 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Create or update the HR element and add the animated redirect message.
-    function addRedirectMessage() {
+    // --- Always create the HR element in showEnabledMessage ---
+    function showEnabledMessage(extension) {
+        removeRedirectMessage();
+        messageElement.innerHTML = `Enabled Mod: <span class="mod-name">${extension.name}</span>`;
+        // Always create HR for separation.
         let hrElement = document.getElementById('message-hr');
         if (!hrElement) {
             hrElement = document.createElement('hr');
             hrElement.id = 'message-hr';
             messageElement.insertAdjacentElement('afterend', hrElement);
         }
+        chrome.storage.local.get('toggleOpenModsTabChecked', ({ toggleOpenModsTabChecked }) => {
+            if (toggleOpenModsTabChecked) {
+                addRedirectMessage();
+            }
+        });
+    }
+
+    function addRedirectMessage() {
+        let hrElement = document.getElementById('message-hr');
+        // hrElement is already present from showEnabledMessage.
         const redirectMessageElement = document.createElement('p');
         redirectMessageElement.textContent = 'Redirecting to enable checkmarks';
         redirectMessageElement.classList.add('redirect-message');
@@ -192,16 +202,6 @@ document.addEventListener('DOMContentLoaded', () => {
             element.textContent = `Redirecting to enable checkmarks${dots}`;
         }, 300);
         element.dataset.intervalId = interval;
-    }
-
-    function showEnabledMessage(extension) {
-        removeRedirectMessage();
-        messageElement.innerHTML = `Enabled Mod: <span class="mod-name">${extension.name}</span>`;
-        chrome.storage.local.get('toggleOpenModsTabChecked', ({ toggleOpenModsTabChecked }) => {
-            if (toggleOpenModsTabChecked) {
-                addRedirectMessage();
-            }
-        });
     }
 
     function removeRedirectMessage() {
