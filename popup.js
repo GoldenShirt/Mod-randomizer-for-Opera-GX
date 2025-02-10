@@ -3,6 +3,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const randomizeButton = document.getElementById('randomizeButton');
     const toggleAutoModIdentification = document.getElementById('toggleAutoModIdentification');
     const toggleRandomizeOnStartup = document.getElementById('toggleRandomizeOnStartup');
+    const toggleOpenModsTab = document.getElementById('toggleOpenModsTab');
+    const toggleRandomizeOnSetTime = document.getElementById('toggleRandomizeOnSetTime');
+    const timeInput = document.getElementById('timeInput');
     const modForm = document.getElementById('modForm');
     const messageElement = document.getElementById('message');
     const searchBar = document.getElementById('searchBar');
@@ -15,6 +18,9 @@ document.addEventListener('DOMContentLoaded', () => {
     function addEventListeners() {
         toggleAutoModIdentification.addEventListener('change', () => handleCheckboxChange('autoModIdentificationChecked', toggleAutoModIdentification.checked));
         toggleRandomizeOnStartup.addEventListener('change', () => handleCheckboxChange('toggleRandomizeOnStartupChecked', toggleRandomizeOnStartup.checked));
+        toggleOpenModsTab.addEventListener('change', () => handleCheckboxChange('toggleOpenModsTabChecked', toggleOpenModsTab.checked));
+        toggleRandomizeOnSetTime.addEventListener('change', () => handleCheckboxChange('toggleRandomizeOnSetTimeChecked', toggleRandomizeOnSetTime.checked));
+        timeInput.addEventListener('input', handleTimeInputChange);
         extensionList.addEventListener('change', handleExtensionListChange);
         randomizeButton.addEventListener('click', () => handleRandomizeButtonClick());
         searchBar.addEventListener('input', handleSearchInput);
@@ -22,15 +28,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function initializeCheckboxStates() {
         chrome.storage.local.get(
-            ['autoModIdentificationChecked', 'toggleRandomizeOnStartupChecked'],
-            ({ autoModIdentificationChecked = false, toggleRandomizeOnStartupChecked = false }) => {
+            ['autoModIdentificationChecked', 'toggleRandomizeOnStartupChecked', 'toggleOpenModsTabChecked', 'toggleRandomizeOnSetTimeChecked', 'randomizeTime'],
+            ({ autoModIdentificationChecked = false, toggleRandomizeOnStartupChecked = false, toggleOpenModsTabChecked = true, toggleRandomizeOnSetTimeChecked = false, randomizeTime = 0 }) => {
                 toggleAutoModIdentification.checked = autoModIdentificationChecked;
                 toggleRandomizeOnStartup.checked = toggleRandomizeOnStartupChecked;
+                toggleOpenModsTab.checked = toggleOpenModsTabChecked;
+                toggleRandomizeOnSetTime.checked = toggleRandomizeOnSetTimeChecked;
+                timeInput.value = randomizeTime > 0 ? randomizeTime : '';
                 updateCheckboxes();
             }
         );
     }
-
 
     function handleExtensionListChange() {
         if (toggleAutoModIdentification.checked) {
@@ -39,7 +47,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         const modExtensionIds = Array.from(document.querySelectorAll('input[type="checkbox"]:checked'))
             .map(checkbox => checkbox.id)
-            .filter(id => !['toggleAutoModIdentification', 'toggleRandomizeOnStartup'].includes(id));
+            .filter(id => !['toggleAutoModIdentification', 'toggleRandomizeOnStartup', 'toggleOpenModsTab', 'toggleRandomizeOnSetTime'].includes(id));
 
         sendMessageToBackground('saveModExtensionIds', { modExtensionIds });
     }
@@ -66,16 +74,21 @@ document.addEventListener('DOMContentLoaded', () => {
         removeRedirectMessage();
     }
 
-
     function handleSearchInput() {
-    const query = searchBar.value.toLowerCase();
-    const listItems = extensionList.getElementsByTagName('li');
-    Array.from(listItems).forEach(li => {
-        const text = li.textContent.toLowerCase();
-        li.style.display = text.includes(query) ? '' : 'none';
-    });
-}
+        const query = searchBar.value.toLowerCase();
+        const listItems = extensionList.getElementsByTagName('li');
+        Array.from(listItems).forEach(li => {
+            const text = li.textContent.toLowerCase();
+            li.style.display = text.includes(query) ? '' : 'none';
+        });
+    }
 
+    function handleTimeInputChange() {
+        const time = parseInt(timeInput.value, 10);
+        if (!isNaN(time)) {
+            sendMessageToBackground('setRandomizeTime', { time });
+        }
+    }
 
     function updateCheckboxes(callback) {
         chrome.runtime.sendMessage({ action: 'getExtensions' }, ({ extensions, modExtensionIds, autoModIdentificationChecked }) => {
@@ -115,7 +128,6 @@ document.addEventListener('DOMContentLoaded', () => {
         return li;
     }
 
-    // popup.js
     function sendMessageToBackground(action, data = {}, callback) {
         chrome.runtime.sendMessage({ action, ...data }, (response) => {
             if (chrome.runtime.lastError) {
@@ -134,7 +146,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (value) {
                     sendMessageToBackground('identifyModExtensions', {}, (response) => {
                         updateCheckboxes(() => {
-                            // Reapply the current search filter after updating
                             handleSearchInput();
                         });
                     });
@@ -143,7 +154,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         handleSearchInput();
                     });
                 }
-                // Disable/enable checkboxes immediately
                 const checkboxes = document.querySelectorAll('#extensionList input[type="checkbox"]');
                 checkboxes.forEach(checkbox => {
                     checkbox.disabled = value;
@@ -151,7 +161,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
-
 
     function addRedirectMessage() {
         const messageElement = document.getElementById('message');
@@ -180,10 +189,8 @@ document.addEventListener('DOMContentLoaded', () => {
         messageElement.innerHTML = `Enabled Mod: <span class="mod-name">${extension.name}</span>`;
         messageElement.classList.add('highlighted-message');
 
-        // Check if the hr element already exists
         let hrElement = document.getElementById('message-hr');
         if (!hrElement) {
-            // If it doesn't exist, create it
             hrElement = document.createElement('hr');
             hrElement.id = 'message-hr';
             messageElement.insertAdjacentElement('afterend', hrElement);
@@ -191,8 +198,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         addRedirectMessage();
         redirectTimeout = setTimeout(() => {
-            chrome.tabs.create({ url: 'opera://mods/manage' });
-            removeRedirectMessage();
+            chrome.storage.local.get('toggleOpenModsTabChecked', ({ toggleOpenModsTabChecked }) => {
+                if (toggleOpenModsTabChecked) {
+                    chrome.tabs.create({ url: 'opera://mods/manage' });
+                }
+                removeRedirectMessage();
+            });
         }, 5000);
     }
 
@@ -205,5 +216,5 @@ document.addEventListener('DOMContentLoaded', () => {
         const hrElement = document.querySelector('#message-hr');
         if (hrElement) hrElement.remove();
     }
-
 });
+
