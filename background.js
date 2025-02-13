@@ -98,7 +98,15 @@ function runStartupLogic() {
             }
         }
     );
+    // NEW: Initialize randomize-on-set-time on startup
+    chrome.storage.local.get(['toggleRandomizeOnSetTimeChecked', 'randomizeTime'], ({ toggleRandomizeOnSetTimeChecked, randomizeTime }) => {
+        const parsedTime = parseFloat(randomizeTime);
+        if (toggleRandomizeOnSetTimeChecked && !isNaN(parsedTime) && parsedTime >= 0.25) {
+            setRandomizeTime(randomizeTime);
+        }
+    });
 }
+
 
 function identifyModExtensions(callback) {
     chrome.management.getAll(extensions => {
@@ -199,43 +207,53 @@ function sendExtensionsData(sendResponse) {
 function setRandomizeTime(time) {
     const parsedTime = parseFloat(time);
     if (isNaN(parsedTime)) {
-        console.log(`Randomize time is not a number. Given: ${time}. No interval scheduled.`);
+        console.log(`Randomize time is not a number: ${time}`);
         return;
     }
     if (parsedTime === 0) {
         chrome.storage.local.set({ randomizeTime: parsedTime }, () => {
             console.log(`Randomize time set to 0 minutes. Timer disabled.`);
-            if (randomizeTimeout) {
-                clearInterval(randomizeTimeout);
-                randomizeTimeout = null;
-            }
+            chrome.alarms.clear('randomizeAlarm');
         });
         return;
     }
     if (parsedTime < 0.25) {
-        console.log(`Randomize time must be at least 0.25 minutes (15 seconds) or 0 to disable. Given: ${time}. No interval scheduled.`);
+        console.log(`Randomize time must be at least 0.25 minutes (15 seconds). Given: ${time}`);
         return;
     }
     chrome.storage.local.set({ randomizeTime: parsedTime }, () => {
         console.log(`Randomize time set to ${parsedTime} minutes`);
         chrome.storage.local.get('toggleRandomizeOnSetTimeChecked', ({ toggleRandomizeOnSetTimeChecked }) => {
             if (toggleRandomizeOnSetTimeChecked) {
-                if (randomizeTimeout) {
-                    clearInterval(randomizeTimeout);
-                }
-                // Recurring randomization every parsedTime minutes.
-                randomizeTimeout = setInterval(() => {
-                    runRandomization((selectedExtension, modExtensionIds) => {
-                        if (selectedExtension) {
-                            console.log('Randomization completed successfully.');
-                        } else {
-                            console.log('Randomization failed.');
-                        }
-                    });
-                }, parsedTime * 60000);
+                // Schedule a persistent alarm.
+                chrome.alarms.create('randomizeAlarm', {
+                    periodInMinutes: parsedTime
+                });
             }
         });
     });
 }
+
+
+chrome.alarms.onAlarm.addListener((alarm) => {
+    if (alarm.name === 'randomizeAlarm') {
+        runRandomization((selectedExtension) => {
+            if (selectedExtension) {
+                console.log('Randomization completed successfully.');
+                chrome.runtime.sendMessage({
+                    action: 'randomizationCompleted',
+                    enabledExtension: { id: selectedExtension.id, name: selectedExtension.name }
+                }, (response) => {
+                    if (chrome.runtime.lastError) {
+                        // No popup open, or no listener; ignore the error
+                        console.warn(chrome.runtime.lastError.message);
+                    }
+                });
+            } else {
+                console.log('Randomization failed.');
+            }
+        });
+    }
+});
 
 

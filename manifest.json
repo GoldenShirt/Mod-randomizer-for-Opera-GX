@@ -5,7 +5,8 @@
   "version": "4.1",
   "permissions": [
     "management",
-    "storage"
+    "storage",
+    "alarms"
   ],
   "host_permissions": [
     "https://api.gx.me/store/mods/update"
