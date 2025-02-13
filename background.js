@@ -236,24 +236,24 @@ function setRandomizeTime(time) {
 
 
 chrome.alarms.onAlarm.addListener((alarm) => {
-    if (alarm.name === 'randomizeAlarm') {
-        runRandomization((selectedExtension) => {
-            if (selectedExtension) {
-                console.log('Randomization completed successfully.');
-                chrome.runtime.sendMessage({
-                    action: 'randomizationCompleted',
-                    enabledExtension: { id: selectedExtension.id, name: selectedExtension.name }
-                }, (response) => {
-                    if (chrome.runtime.lastError) {
-                        // No popup open, or no listener; ignore the error
-                        console.warn(chrome.runtime.lastError.message);
-                    }
-                });
-            } else {
-                console.log('Randomization failed.');
-            }
+  if (alarm.name === 'randomizeAlarm') {
+    runRandomization((selectedExtension) => {
+      if (selectedExtension) {
+        console.log('Randomization completed successfully.');
+        chrome.runtime.sendMessage({
+          action: 'randomizationCompleted',
+          enabledExtension: { id: selectedExtension.id, name: selectedExtension.name }
+        }, (response) => {
+          if (chrome.runtime.lastError) {
+            // No popup open, or no listener; ignore the error
+            console.warn(chrome.runtime.lastError.message);
+          }
         });
-    }
+      } else {
+        console.log('Randomization failed.');
+      }
+    });
+  }
 });
 
 
