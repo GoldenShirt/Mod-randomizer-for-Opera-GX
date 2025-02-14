@@ -125,7 +125,7 @@ function saveModExtensionIds(modExtensionIds) {
     });
 }
 
-function runRandomization() {
+function runRandomization(callback) {
     chrome.storage.local.get(['modExtensionIds', 'toggleOpenModsTabChecked'], ({ modExtensionIds, toggleOpenModsTabChecked }) => {
         if (modExtensionIds && modExtensionIds.length > 0) {
             handleModExtensions(modExtensionIds, (selectedExtension, modExtensionIds) => {
@@ -143,10 +143,15 @@ function runRandomization() {
                             }, 5000);
                         }
                     });
+                    // Send a response back to the popup script to show the redirect message.
+                    if (callback) callback(selectedExtension, modExtensionIds);
+                } else {
+                    if (callback) callback(null, modExtensionIds);
                 }
             });
         } else {
             console.log('No mod extensions found.');
+            if (callback) callback(null, modExtensionIds);
         }
     });
 }
