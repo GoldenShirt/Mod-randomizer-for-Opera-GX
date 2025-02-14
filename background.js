@@ -125,25 +125,22 @@ function saveModExtensionIds(modExtensionIds) {
     });
 }
 
-function runRandomization(callback) {
+// Modified runRandomization function accepts an optional redirectDelay (default: 5000 ms)
+function runRandomization(callback, redirectDelay = 5000) {
     chrome.storage.local.get(['modExtensionIds', 'toggleOpenModsTabChecked'], ({ modExtensionIds, toggleOpenModsTabChecked }) => {
         if (modExtensionIds && modExtensionIds.length > 0) {
             handleModExtensions(modExtensionIds, (selectedExtension, modExtensionIds) => {
                 if (selectedExtension) {
-                    // Always schedule redirection after 5 seconds if the setting is on.
+                    // Use the passed redirectDelay for the redirection timeout
                     chrome.storage.local.get('toggleOpenModsTabChecked', ({ toggleOpenModsTabChecked }) => {
                         if (toggleOpenModsTabChecked) {
-                            // Reset the redirection timer if it already exists.
-                            if (redirectTimeout) {
-                                clearTimeout(redirectTimeout);
-                            }
+                            if (redirectTimeout) clearTimeout(redirectTimeout);
                             redirectTimeout = setTimeout(() => {
                                 chrome.tabs.create({ url: 'opera://mods/manage' });
                                 redirectTimeout = null;
-                            }, 5000);
+                            }, redirectDelay);
                         }
                     });
-                    // Send a response back to the popup script to show the redirect message.
                     if (callback) callback(selectedExtension, modExtensionIds);
                 } else {
                     if (callback) callback(null, modExtensionIds);
@@ -155,7 +152,6 @@ function runRandomization(callback) {
         }
     });
 }
-
 function handleModExtensions(modExtensionIds, callback) {
     chrome.storage.local.get(['lastEnabledModId'], ({ lastEnabledModId }) => {
         chrome.management.getAll(extensions => {
@@ -207,31 +203,33 @@ function setRandomizeTime(time) {
         console.log(`Randomize time is not a number: ${time}`);
         return;
     }
-    if (parsedTime === 0) {
+    chrome.alarms.clear('randomizeAlarm', () => {
+        if (parsedTime === 0) {
+            chrome.storage.local.set({ randomizeTime: parsedTime }, () => {
+                console.log(`Randomize time set to 0 minutes. Timer disabled.`);
+            });
+            return;
+        }
+        if (parsedTime < 0.25) {
+            console.log(`Randomize time must be at least 0.25 minutes (15 seconds). Given: ${time}`);
+            return;
+        }
         chrome.storage.local.set({ randomizeTime: parsedTime }, () => {
-            console.log(`Randomize time set to 0 minutes. Timer disabled.`);
-            chrome.alarms.clear('randomizeAlarm');
-        });
-        return;
-    }
-    if (parsedTime < 0.25) {
-        console.log(`Randomize time must be at least 0.25 minutes (15 seconds). Given: ${time}`);
-        return;
-    }
-    chrome.storage.local.set({ randomizeTime: parsedTime }, () => {
-        console.log(`Randomize time set to ${parsedTime} minutes`);
-        chrome.storage.local.get('toggleRandomizeOnSetTimeChecked', ({ toggleRandomizeOnSetTimeChecked }) => {
-            if (toggleRandomizeOnSetTimeChecked) {
-                // Schedule a persistent alarm.
-                chrome.alarms.create('randomizeAlarm', {
-                    periodInMinutes: parsedTime
-                });
-            }
+            console.log(`Randomize time set to ${parsedTime} minutes`);
+            chrome.storage.local.get('toggleRandomizeOnSetTimeChecked', ({ toggleRandomizeOnSetTimeChecked }) => {
+                if (toggleRandomizeOnSetTimeChecked) {
+                    // Schedule a persistent alarm.
+                    chrome.alarms.create('randomizeAlarm', {
+                        periodInMinutes: parsedTime
+                    });
+                }
+            });
         });
     });
 }
 
 
+// In your alarm listener, pass a 1 second delay:
 chrome.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name === 'randomizeAlarm') {
         runRandomization((selectedExtension) => {
@@ -240,7 +238,6 @@ chrome.alarms.onAlarm.addListener((alarm) => {
             } else {
                 console.log('Randomization failed.');
             }
-        });
+        }, 500); // Use half second delay for alarms
     }
 });
-
