@@ -54,6 +54,22 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 sendResponse({ extensions: filteredExtensions });
             });
             return true;
+        case 'toggleRandomizeOnSetTimeChecked':
+            if (message.value) {
+                chrome.storage.local.get('randomizeTime', ({ randomizeTime }) => {
+                    setRandomizeTime(randomizeTime);
+                });
+            } else {
+                if (randomizeTimeout) {
+                    clearInterval(randomizeTimeout);
+                    randomizeTimeout = null;
+                }
+                chrome.alarms.clear('randomizeAlarm', () => {
+                    console.log('Randomize alarm cleared.');
+                });
+            }
+            sendResponse({ status: 'success' });
+            break;
         case 'setRandomizeTime':
             setRandomizeTime(message.time);
             sendResponse({ status: 'success' });
@@ -65,23 +81,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
 });
 
-// Listen for changes to the "Randomize on Set Time" toggle.
-chrome.storage.onChanged.addListener((changes, area) => {
-    if (area === 'local' && changes.toggleRandomizeOnSetTimeChecked) {
-        const newVal = changes.toggleRandomizeOnSetTimeChecked.newValue;
-        if (newVal) {
-            // If enabled, fetch the last set randomize time and schedule.
-            chrome.storage.local.get('randomizeTime', ({ randomizeTime }) => {
-                setRandomizeTime(randomizeTime);
-            });
-        } else {
-            if (randomizeTimeout) {
-                clearInterval(randomizeTimeout);
-                randomizeTimeout = null;
-            }
-        }
-    }
-});
 
 function runStartupLogic() {
     chrome.storage.local.get(
@@ -126,16 +125,11 @@ function saveModExtensionIds(modExtensionIds) {
     });
 }
 
-function runRandomization(callback) {
+function runRandomization() {
     chrome.storage.local.get(['modExtensionIds', 'toggleOpenModsTabChecked'], ({ modExtensionIds, toggleOpenModsTabChecked }) => {
         if (modExtensionIds && modExtensionIds.length > 0) {
             handleModExtensions(modExtensionIds, (selectedExtension, modExtensionIds) => {
                 if (selectedExtension) {
-                    // Notify the popup.
-                    chrome.runtime.sendMessage({
-                        action: 'randomizationCompleted',
-                        enabledExtension: { id: selectedExtension.id, name: selectedExtension.name }
-                    });
                     // Always schedule redirection after 5 seconds if the setting is on.
                     chrome.storage.local.get('toggleOpenModsTabChecked', ({ toggleOpenModsTabChecked }) => {
                         if (toggleOpenModsTabChecked) {
@@ -150,11 +144,9 @@ function runRandomization(callback) {
                         }
                     });
                 }
-                if (callback) callback(selectedExtension, modExtensionIds);
             });
         } else {
             console.log('No mod extensions found.');
-            if (callback) callback(null, modExtensionIds);
         }
     });
 }
@@ -236,24 +228,14 @@ function setRandomizeTime(time) {
 
 
 chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name === 'randomizeAlarm') {
-    runRandomization((selectedExtension) => {
-      if (selectedExtension) {
-        console.log('Randomization completed successfully.');
-        chrome.runtime.sendMessage({
-          action: 'randomizationCompleted',
-          enabledExtension: { id: selectedExtension.id, name: selectedExtension.name }
-        }, (response) => {
-          if (chrome.runtime.lastError) {
-            // No popup open, or no listener; ignore the error
-            console.warn(chrome.runtime.lastError.message);
-          }
+    if (alarm.name === 'randomizeAlarm') {
+        runRandomization((selectedExtension) => {
+            if (selectedExtension) {
+                console.log('Randomization completed successfully.');
+            } else {
+                console.log('Randomization failed.');
+            }
         });
-      } else {
-        console.log('Randomization failed.');
-      }
-    });
-  }
+    }
 });
-
 

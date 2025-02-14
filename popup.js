@@ -84,12 +84,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function handleRandomizeButtonClick() {
         sendMessageToBackground('randomizeMods', {}, (response) => {
-            if (response && response.status === 'error') {
-                console.error(response.message);
+            if (response.status === 'success') {
+                showEnabledMessage(response.enabledExtension);
+            } else {
+                console.error('Randomization failed:', response.message);
             }
         });
         removeRedirectMessage();
     }
+
+
 
     function handleSearchInput() {
         const query = searchBar.value.toLowerCase();
@@ -169,9 +173,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.querySelectorAll('#extensionList input[type="checkbox"]').forEach(checkbox => {
                     checkbox.disabled = value;
                 });
+            } else if (key === 'toggleRandomizeOnSetTimeChecked') {
+                sendMessageToBackground('toggleRandomizeOnSetTimeChecked', { value });
             }
         });
     }
+
 
     // --- Always create the HR element in showEnabledMessage ---
     function showEnabledMessage(extension) {
