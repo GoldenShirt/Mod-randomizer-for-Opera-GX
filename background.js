@@ -34,7 +34,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         case 'randomizeMods':
             runRandomization((selectedExtension, modExtensionIds) => {
                 if (selectedExtension) {
-                    chrome.storage.local.set({ currentMod: selectedExtension.name });
                     sendResponse({
                         status: 'success',
                         enabledExtension: { id: selectedExtension.id, name: selectedExtension.name },
@@ -175,7 +174,7 @@ function handleModExtensions(modExtensionIds, callback) {
                     const selectedExtension = disabledMods[randomIndex];
                     chrome.management.setEnabled(selectedExtension.id, true, () => {
                         console.log(`Enabled selected mod extension: id: ${selectedExtension.id}, name: ${selectedExtension.name}`);
-                        chrome.storage.local.set({ lastEnabledModId: selectedExtension.id }, () => {
+                        chrome.storage.local.set({ lastEnabledModId: selectedExtension.id, currentMod: selectedExtension.name }, () => {
                             if (callback) callback(selectedExtension, modExtensionIds);
                         });
                     });
