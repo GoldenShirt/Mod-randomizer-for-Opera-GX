@@ -11,23 +11,25 @@ document.addEventListener('DOMContentLoaded', () => {
     const searchBar = document.getElementById('searchBar');
     let redirectTimeout;
 
-    // New code to update the current mod element
-    chrome.storage.local.get('currentMod', ({ currentMod }) => {
-        const currentModElement = document.getElementById('current-mod');
-        if (currentModElement) {
-            currentModElement.textContent = `Current Mod: ${currentMod || 'None'}`;
-        }
-    });
-
-    chrome.storage.onChanged.addListener((changes, area) => {
-        if (area === 'local' && changes.currentMod) {
+    // Function to update the currentMod element
+    function updateCurrentMod() {
+        chrome.storage.local.get('currentMod', ({ currentMod }) => {
             const currentModElement = document.getElementById('current-mod');
             if (currentModElement) {
-                currentModElement.textContent = `Current Mod: ${changes.currentMod.newValue || 'None'}`;
+                currentModElement.textContent = `Current Mod: ${currentMod || 'None'}`;
             }
+        });
+    }
+
+    // Update currentMod on popup load
+    updateCurrentMod();
+
+    // Listen for storage changes to update the currentMod element
+    chrome.storage.onChanged.addListener((changes, area) => {
+        if (area === 'local' && changes.currentMod) {
+            updateCurrentMod();
         }
     });
-
 
     // Prevent default form submission when pressing Enter.
     modForm.addEventListener('submit', (e) => e.preventDefault());
