@@ -65,7 +65,7 @@ h2 {
 
 #current-mod {
     font-size: 1.5em;
-    color: #bbb;
+    color: #333;
     text-align: center;
     margin-top: -8px;
 }
@@ -384,7 +384,9 @@ h3 {
     #message {
         color: #28a745;
     }
-
+    #current-mod {
+        color: #bbb;
+    }
     .mod-name {
         color: #ff5722;
     }
