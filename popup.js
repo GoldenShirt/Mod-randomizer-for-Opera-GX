@@ -11,6 +11,24 @@ document.addEventListener('DOMContentLoaded', () => {
     const searchBar = document.getElementById('searchBar');
     let redirectTimeout;
 
+    // New code to update the current mod element
+    chrome.storage.local.get('currentMod', ({ currentMod }) => {
+        const currentModElement = document.getElementById('current-mod');
+        if (currentModElement) {
+            currentModElement.textContent = `Current Mod: ${currentMod || 'None'}`;
+        }
+    });
+
+    chrome.storage.onChanged.addListener((changes, area) => {
+        if (area === 'local' && changes.currentMod) {
+            const currentModElement = document.getElementById('current-mod');
+            if (currentModElement) {
+                currentModElement.textContent = `Current Mod: ${changes.currentMod.newValue || 'None'}`;
+            }
+        }
+    });
+
+
     // Prevent default form submission when pressing Enter.
     modForm.addEventListener('submit', (e) => e.preventDefault());
 
@@ -93,8 +111,6 @@ document.addEventListener('DOMContentLoaded', () => {
         removeRedirectMessage();
     }
 
-
-
     function handleSearchInput() {
         const query = searchBar.value.toLowerCase();
         const listItems = extensionList.getElementsByTagName('li');
@@ -123,7 +139,6 @@ document.addEventListener('DOMContentLoaded', () => {
         messageElement.textContent = '';
         sendMessageToBackground('setRandomizeTime', { time });
     }
-
 
     function updateCheckboxes(callback) {
         chrome.runtime.sendMessage({ action: 'getExtensions' }, ({ extensions, modExtensionIds, autoModIdentificationChecked }) => {
@@ -178,7 +193,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
-
 
     // --- Always create the HR element in showEnabledMessage ---
     function showEnabledMessage(extension) {

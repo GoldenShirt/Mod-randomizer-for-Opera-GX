@@ -56,10 +56,18 @@ body {
 }
 
 h2 {
+    margin-top: 0; /* Removed top margin */
     text-align: center;
     margin-bottom: 1rem; /* Increased margin */
     font-size: 1.6rem; /* Slightly larger font size */
     font-weight: bold; /* Bolder font */
+}
+
+#current-mod {
+    font-size: 0.9em;
+    color: #bbb;
+    text-align: center;
+    margin-top: -8px;
 }
 
 ul {

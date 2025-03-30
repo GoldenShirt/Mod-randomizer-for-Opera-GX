@@ -8,7 +8,8 @@ chrome.runtime.onInstalled.addListener(() => {
         autoModIdentificationChecked: true,
         toggleOpenModsTabChecked: true,
         toggleRandomizeOnSetTimeChecked: false,
-        randomizeTime: 0
+        randomizeTime: 0,
+        currentMod: "None"
     };
     chrome.storage.local.set(initialSettings, () => {
         console.log('Mod Randomizer: Installed with settings:', initialSettings);
@@ -33,6 +34,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         case 'randomizeMods':
             runRandomization((selectedExtension, modExtensionIds) => {
                 if (selectedExtension) {
+                    chrome.storage.local.set({ currentMod: selectedExtension.name });
                     sendResponse({
                         status: 'success',
                         enabledExtension: { id: selectedExtension.id, name: selectedExtension.name },
