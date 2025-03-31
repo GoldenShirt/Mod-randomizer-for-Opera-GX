@@ -244,8 +244,8 @@ button {
         height: 35px;
     }
 .redirect-message {
-    font-size: 1rem;
-    color: #333;
+    font-size: 16px;
+    color: #007bff;
     text-align: center;
     margin-top: 10px;
 }
@@ -281,8 +281,11 @@ button {
 #message {
     font-size: 18px;
     margin: 10px 0;
+    color: #28a745; /* Green-like color */
 }
-
+.mod-name {
+    color: #ff5722; /* Orange-like color */
+}
 /* Slider & Checkbox Interactions */
 input:checked + .slider {
     background-color: #007bff;
