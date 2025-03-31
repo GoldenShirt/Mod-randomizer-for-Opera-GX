@@ -12,47 +12,53 @@
         <h2>Mod Randomizer</h2>
         <p id="current-mod">Current Mod: None</p>
         <form id="modForm">
-            <div class="option-container">
-                <label class="switch-label">
-                    <span>Automatic Mod Identification</span>
-                    <label class="switch">
-                        <input type="checkbox" id="toggleAutoModIdentification">
-                        <span class="slider"></span>
+            <!-- Automatic Controls Section -->
+            <fieldset class="auto-section">
+                <legend>Automatic Controls</legend>
+                <div class="option-container">
+                    <label class="switch-label" title="Enable automatic mod detection">
+                        <span>Automatic Mod Identification</span>
+                        <label class="switch">
+                            <input type="checkbox" id="toggleAutoModIdentification">
+                            <span class="slider"></span>
+                        </label>
                     </label>
-                </label>
-                <label class="switch-label">
-                    <span>Open mods tab</span>
-                    <label class="switch">
-                        <input type="checkbox" id="toggleOpenModsTab">
-                        <span class="slider"></span>
+                    <label class="switch-label" title="Automatically open mods tab">
+                        <span>Open mods tab</span>
+                        <label class="switch">
+                            <input type="checkbox" id="toggleOpenModsTab">
+                            <span class="slider"></span>
+                        </label>
                     </label>
-                </label>
-                <label class="switch-label">
-                    <span>Randomize on OperaGX startup</span>
-                    <label class="switch">
-                        <input type="checkbox" id="toggleRandomizeOnStartup">
-                        <span class="slider"></span>
+                    <label class="switch-label" title="Randomize mod when OperaGX starts">
+                        <span>Randomize on OperaGX startup</span>
+                        <label class="switch">
+                            <input type="checkbox" id="toggleRandomizeOnStartup">
+                            <span class="slider"></span>
+                        </label>
                     </label>
-                </label>
-                <label class="switch-label">
-                    <span>Randomize Mods on Set Time</span>
-                    <label class="switch">
-                        <input type="checkbox" id="toggleRandomizeOnSetTime">
-                        <span class="slider"></span>
+                    <label class="switch-label" title="Enable time-based randomization">
+                        <span>Randomize Mods on Set Time</span>
+                        <label class="switch">
+                            <input type="checkbox" id="toggleRandomizeOnSetTime">
+                            <span class="slider"></span>
+                        </label>
                     </label>
-                </label>
-            </div>
+                    <div class="time-setting-container">
+                        <input type="number" id="timeInput" min="0.25" step="0.25" placeholder="Enter time in minutes">
+                    </div>
+                </div>
+            </fieldset>
             <button id="randomizeButton" type="button">Randomize</button>
-            <div class="time-setting-container">
-                <input type="number" id="timeInput" min="0.25" step="0.25" placeholder="Enter time in minutes">
-            </div>
             <hr>
-            <div id="message"></div>
-            <div class="advanced-section">
-                <h3>Manual Mod Selection - Disable Automatic Mod Identification to edit</h3>
-                <input type="text" id="searchBar" placeholder="Search mods...">
+            <!-- Manual Controls Section -->
+            <fieldset class="manual-section">
+                <legend>Manual Mod Selection</legend>
+                <p class="section-note">Disable Automatic Mod Identification to edit</p>
+                <input type="text" id="searchBar" placeholder="Search mods..." title="Search available mods">
                 <ul id="extensionList"></ul>
-            </div>
+            </fieldset>
+            <div id="message"></div>
         </form>
     </div>
     <script src="popup.js"></script>
