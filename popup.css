@@ -246,6 +246,7 @@ button {
 
 #searchBar {
     width: 95%; /* Slightly less wide */
+    height: 30px;
     padding: 0.5rem;
     margin-bottom: 0;
     border: 1px solid #ccc;
