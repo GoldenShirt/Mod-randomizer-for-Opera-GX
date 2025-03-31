@@ -243,7 +243,13 @@ button {
         border-radius: 5px;
         height: 35px;
     }
-
+.redirect-message {
+    font-size: 1rem;
+    color: #333;
+    text-align: center;
+    margin-top: 10px;
+}
+  
 #searchBar {
     width: 95%; /* Slightly less wide */
     height: 30px;

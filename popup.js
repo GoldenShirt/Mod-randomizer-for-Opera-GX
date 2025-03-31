@@ -199,14 +199,27 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Always create the HR element in showEnabledMessage ---
     function showEnabledMessage(extension) {
         removeRedirectMessage();
-        messageElement.innerHTML = `Enabled Mod: <span class="mod-name">${extension.name}</span>`;
-        // Always create HR for separation.
+
+        // Create or update the HR element right after the randomize button.
         let hrElement = document.getElementById('message-hr');
         if (!hrElement) {
             hrElement = document.createElement('hr');
             hrElement.id = 'message-hr';
-            messageElement.insertAdjacentElement('afterend', hrElement);
+            randomizeButton.insertAdjacentElement('afterend', hrElement);
         }
+
+        // Remove any existing enabled message.
+        let enabledMessageElement = document.getElementById('enabledMessage');
+        if (enabledMessageElement) {
+            enabledMessageElement.remove();
+        }
+        enabledMessageElement = document.createElement('div');
+        enabledMessageElement.id = 'enabledMessage';
+        enabledMessageElement.innerHTML = `Enabled Mod: <span class="mod-name">${extension.name}</span>`;
+
+        // Insert the enabled message after the HR element.
+        hrElement.insertAdjacentElement('afterend', enabledMessageElement);
+
         chrome.storage.local.get('toggleOpenModsTabChecked', ({ toggleOpenModsTabChecked }) => {
             if (toggleOpenModsTabChecked) {
                 addRedirectMessage();
@@ -215,13 +228,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function addRedirectMessage() {
-        let hrElement = document.getElementById('message-hr');
-        // hrElement is already present from showEnabledMessage.
-        const redirectMessageElement = document.createElement('p');
-        redirectMessageElement.textContent = 'Redirecting to enable checkmarks';
-        redirectMessageElement.classList.add('redirect-message');
-        hrElement.insertAdjacentElement('beforebegin', redirectMessageElement);
-        animateRedirectMessage(redirectMessageElement);
+        // Get the enabled message element so the redirect is inserted right below it.
+        let enabledMessageElement = document.getElementById('enabledMessage');
+        if (enabledMessageElement) {
+            const redirectMessageElement = document.createElement('p');
+            redirectMessageElement.textContent = 'Redirecting to enable checkmarks';
+            redirectMessageElement.classList.add('redirect-message');
+            enabledMessageElement.insertAdjacentElement('afterend', redirectMessageElement);
+            animateRedirectMessage(redirectMessageElement);
+        }
     }
 
     function animateRedirectMessage(element) {
@@ -234,15 +249,25 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function removeRedirectMessage() {
+        // Remove any redirect message element and clear its interval.
         document.querySelectorAll('.redirect-message').forEach(element => {
-            if (element.dataset.intervalId) clearInterval(parseInt(element.dataset.intervalId));
+            if (element.dataset.intervalId) {
+                clearInterval(parseInt(element.dataset.intervalId));
+            }
             element.remove();
         });
+        // Remove the HR line if present.
         const hrElement = document.getElementById('message-hr');
         if (hrElement) {
             hrElement.remove();
         }
+        // Remove the enabled message.
+        const enabledMessageElement = document.getElementById('enabledMessage');
+        if (enabledMessageElement) {
+            enabledMessageElement.remove();
+        }
     }
+
 
     // Listen for background messages (when randomization completes)
     chrome.runtime.onMessage.addListener((message) => {
