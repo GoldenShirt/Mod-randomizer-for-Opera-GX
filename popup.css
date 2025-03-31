@@ -371,7 +371,9 @@ input:checked + .slider:before {
         input:checked + .slider:before {
             background-color: #ffffff;
         }
-
+    hr {
+        border-color: #555; /* Adjust this value as needed */
+    }
     .switch:hover .slider {
         background-color: #0056b3;
     }
