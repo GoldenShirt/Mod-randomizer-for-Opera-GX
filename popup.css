@@ -218,7 +218,15 @@ button {
     font-weight: 600;
     height: 60px; /* Restored to original size */
 }
+/* Hover effect for the time box */
+.time-setting-container input:hover {
+    border-color: #007bff;
+}
 
+/* Hover effect for the search box */
+#searchBar:hover {
+    border-color: #007bff;
+}
 .time-setting-container {
     display: flex;
     align-items: center;
@@ -356,7 +364,13 @@ input:checked + .slider:before {
     .switch:hover .slider {
         background-color: #0056b3;
     }
+    .time-setting-container input:hover {
+        border-color: #007bff;
+    }
 
+    #searchBar:hover {
+        border-color: #007bff;
+    }
     #searchBar {
         background-color: #333;
         color: #f5f5f5;
