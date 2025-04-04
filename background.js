@@ -71,6 +71,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             }
             sendResponse({ status: 'success' });
             break;
+        case 'popupOpened':
+            chrome.storage.local.get('autoModIdentificationChecked', ({ autoModIdentificationChecked }) => {
+                if (autoModIdentificationChecked) {
+                    identifyModExtensions(() => {
+                        sendResponse({ status: 'success' });
+                    });
+                } else {
+                    sendResponse({ status: 'success' });
+                }
+            });
+            break;
         case 'setRandomizeTime':
             setRandomizeTime(message.time);
             sendResponse({ status: 'success' });

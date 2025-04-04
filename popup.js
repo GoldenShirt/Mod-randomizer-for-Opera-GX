@@ -37,6 +37,14 @@ document.addEventListener('DOMContentLoaded', () => {
     addEventListeners();
     initializeCheckboxStates();
 
+    // When the popup opens, send a "popupOpened" message to the background.
+    // The background will trigger mod identification if the setting is enabled.
+    chrome.runtime.sendMessage({ action: 'popupOpened' }, (response) => {
+        if (response && response.status === 'success') {
+            updateCheckboxes();
+        }
+    });
+
     function addEventListeners() {
         toggleAutoModIdentification.addEventListener('change', () =>
             handleCheckboxChange('autoModIdentificationChecked', toggleAutoModIdentification.checked)
@@ -103,11 +111,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function handleRandomizeButtonClick() {
+     randomizeMods();
+    }
+
+    function randomizeMods() {
         sendMessageToBackground('randomizeMods', {}, (response) => {
-            if (response.status === 'success') {
+            if (response && response.status === 'success') {
                 showEnabledMessage(response.enabledExtension);
             } else {
-                console.error('Randomization failed:', response.message);
+                console.error('Randomization failed:', response && response.message);
             }
         });
         removeRedirectMessage();
@@ -267,7 +279,6 @@ document.addEventListener('DOMContentLoaded', () => {
             enabledMessageElement.remove();
         }
     }
-
 
     // Listen for background messages (when randomization completes)
     chrome.runtime.onMessage.addListener((message) => {
