@@ -95,6 +95,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 
 function runStartupLogic() {
+    chrome.alarms.clear('randomizeAlarm');
     chrome.storage.local.get(
         ['toggleRandomizeOnStartupChecked', 'modExtensionIds', 'toggleOpenModsTabChecked'],
         ({ toggleRandomizeOnStartupChecked, modExtensionIds = [], toggleOpenModsTabChecked }) => {
