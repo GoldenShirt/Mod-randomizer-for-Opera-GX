@@ -1,5 +1,5 @@
-let redirectTimeout = null;
-let randomizeTimeout;
+let redirectTimeout = null; // NEW: To track redirection timer
+let randomizeTimeout; // For recurring randomization
 
 chrome.runtime.onInstalled.addListener(() => {
     const initialSettings = {
@@ -49,8 +49,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             break;
         case 'SEARCH_QUERY':
             chrome.management.getAll(extensions => {
-                const filteredExtensions = extensions.filter(ext =>
-                    ext.name.toLowerCase().includes(query.toLowerCase())
+                const filteredExtensions = extensions.filter(extension =>
+                    extension.name.toLowerCase().includes(query.toLowerCase())
                 );
                 sendResponse({ extensions: filteredExtensions });
             });
@@ -74,7 +74,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         case 'popupOpened':
             chrome.storage.local.get('autoModIdentificationChecked', ({ autoModIdentificationChecked }) => {
                 if (autoModIdentificationChecked) {
-                    identifyModExtensions(() => sendResponse({ status: 'success' }));
+                    identifyModExtensions(() => {
+                        sendResponse({ status: 'success' });
+                    });
                 } else {
                     sendResponse({ status: 'success' });
                 }
@@ -91,25 +93,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
 });
 
+
 function runStartupLogic() {
-    // 🔪 clear any missed alarm backlog
     chrome.alarms.clear('randomizeAlarm');
-
-    // 🔁 re-schedule existing set-time alarm if enabled
-    chrome.storage.local.get(
-        ['toggleRandomizeOnSetTimeChecked', 'randomizeTime'],
-        ({ toggleRandomizeOnSetTimeChecked, randomizeTime }) => {
-            const minutes = parseFloat(randomizeTime);
-            if (toggleRandomizeOnSetTimeChecked && minutes >= 0.25) {
-                chrome.alarms.create('randomizeAlarm', {
-                    delayInMinutes: minutes,
-                    periodInMinutes: minutes
-                });
-            }
-        }
-    );
-
-    // existing startup randomize and tab-open logic
     chrome.storage.local.get(
         ['toggleRandomizeOnStartupChecked', 'modExtensionIds', 'toggleOpenModsTabChecked'],
         ({ toggleRandomizeOnStartupChecked, modExtensionIds = [], toggleOpenModsTabChecked }) => {
@@ -124,13 +110,21 @@ function runStartupLogic() {
             }
         }
     );
+    // NEW: Initialize randomize-on-set-time on startup
+    chrome.storage.local.get(['toggleRandomizeOnSetTimeChecked', 'randomizeTime'], ({ toggleRandomizeOnSetTimeChecked, randomizeTime }) => {
+        const parsedTime = parseFloat(randomizeTime);
+        if (toggleRandomizeOnSetTimeChecked && !isNaN(parsedTime) && parsedTime >= 0.25) {
+            setRandomizeTime(randomizeTime);
+        }
+    });
 }
+
 
 function identifyModExtensions(callback) {
     chrome.management.getAll(extensions => {
         const modExtensionIds = extensions
-            .filter(ext => ext.updateUrl === 'https://api.gx.me/store/mods/update')
-            .map(ext => ext.id);
+            .filter(extension => extension.updateUrl === 'https://api.gx.me/store/mods/update')
+            .map(extension => extension.id);
         chrome.storage.local.set({ modExtensionIds }, () => {
             console.log('Identified mod extensions:', modExtensionIds);
             if (callback) callback(modExtensionIds);
@@ -144,11 +138,13 @@ function saveModExtensionIds(modExtensionIds) {
     });
 }
 
+// Modified runRandomization function accepts an optional redirectDelay (default: 5000 ms)
 function runRandomization(callback, redirectDelay = 5000) {
     chrome.storage.local.get(['modExtensionIds', 'toggleOpenModsTabChecked'], ({ modExtensionIds, toggleOpenModsTabChecked }) => {
-        if (modExtensionIds && modExtensionIds.length) {
-            handleModExtensions(modExtensionIds, (selectedExtension, _ids) => {
+        if (modExtensionIds && modExtensionIds.length > 0) {
+            handleModExtensions(modExtensionIds, (selectedExtension, modExtensionIds) => {
                 if (selectedExtension) {
+                    // Use the passed redirectDelay for the redirection timeout
                     chrome.storage.local.get('toggleOpenModsTabChecked', ({ toggleOpenModsTabChecked }) => {
                         if (toggleOpenModsTabChecked) {
                             if (redirectTimeout) clearTimeout(redirectTimeout);
@@ -158,55 +154,85 @@ function runRandomization(callback, redirectDelay = 5000) {
                             }, redirectDelay);
                         }
                     });
-                    callback && callback(selectedExtension, modExtensionIds);
+                    if (callback) callback(selectedExtension, modExtensionIds);
                 } else {
-                    callback && callback(null, modExtensionIds);
+                    if (callback) callback(null, modExtensionIds);
                 }
             });
         } else {
             console.log('No mod extensions found.');
-            callback && callback(null, modExtensionIds);
+            if (callback) callback(null, modExtensionIds);
         }
     });
 }
-
 function handleModExtensions(modExtensionIds, callback) {
     chrome.storage.local.get(['lastEnabledModId'], ({ lastEnabledModId }) => {
         chrome.management.getAll(extensions => {
-            const mods = extensions.filter(ext => modExtensionIds.includes(ext.id));
-            mods.forEach(ext => ext.enabled &&
-                chrome.management.setEnabled(ext.id, false)
-            );
-            let disabled = mods.filter(ext => !ext.enabled);
-            if (lastEnabledModId) disabled = disabled.filter(ext => ext.id !== lastEnabledModId);
-            if (!disabled.length) return callback && callback(null, modExtensionIds);
-            const pick = disabled[Math.floor(Math.random()*disabled.length)];
-            chrome.management.setEnabled(pick.id, true, () => {
-                console.log(`Enabled: ${pick.name}`);
-                chrome.storage.local.set({ lastEnabledModId: pick.id, currentMod: pick.name }, () => callback && callback(pick, modExtensionIds));
-            });
+            const modExtensions = extensions.filter(extension => modExtensionIds.includes(extension.id));
+            if (modExtensions.length > 0) {
+                modExtensions.forEach(extension => {
+                    if (extension.enabled) {
+                        chrome.management.setEnabled(extension.id, false, () => {
+                            console.log(`Disabled Extension: id: ${extension.id}, name: ${extension.name}`);
+                        });
+                    }
+                });
+                let disabledMods = modExtensions.filter(extension => !extension.enabled);
+                if (lastEnabledModId) {
+                    disabledMods = disabledMods.filter(mod => mod.id !== lastEnabledModId);
+                }
+                if (disabledMods.length > 0) {
+                    const randomIndex = Math.floor(Math.random() * disabledMods.length);
+                    const selectedExtension = disabledMods[randomIndex];
+                    chrome.management.setEnabled(selectedExtension.id, true, () => {
+                        console.log(`Enabled selected mod extension: id: ${selectedExtension.id}, name: ${selectedExtension.name}`);
+                        chrome.storage.local.set({ lastEnabledModId: selectedExtension.id, currentMod: selectedExtension.name }, () => {
+                            if (callback) callback(selectedExtension, modExtensionIds);
+                        });
+                    });
+                } else {
+                    console.log('No disabled mods available (excluding last enabled).');
+                    if (callback) callback(null, modExtensionIds);
+                }
+            } else {
+                console.log('No mod extensions found.');
+                if (callback) callback(null, modExtensionIds);
+            }
         });
     });
 }
 
 function sendExtensionsData(sendResponse) {
     chrome.storage.local.get(['modExtensionIds', 'autoModIdentificationChecked'], ({ modExtensionIds = [], autoModIdentificationChecked }) => {
-        chrome.management.getAll(exts => sendResponse({ extensions: exts, modExtensionIds, autoModIdentificationChecked }));
+        chrome.management.getAll(extensions => {
+            sendResponse({ extensions, modExtensionIds, autoModIdentificationChecked });
+        });
     });
 }
 
 function setRandomizeTime(time) {
     const parsedTime = parseFloat(time);
-    if (isNaN(parsedTime)) return console.log(`Randomize time is not a number: ${time}`);
+    if (isNaN(parsedTime)) {
+        console.log(`Randomize time is not a number: ${time}`);
+        return;
+    }
     chrome.alarms.clear('randomizeAlarm', () => {
-        if (parsedTime === 0) return chrome.storage.local.set({ randomizeTime: parsedTime }, () => console.log(`Timer disabled.`));
-        if (parsedTime < 0.25) return console.log(`Time must be at least 0.25 minutes. Given: ${time}`);
+        if (parsedTime === 0) {
+            chrome.storage.local.set({ randomizeTime: parsedTime }, () => {
+                console.log(`Randomize time set to 0 minutes. Timer disabled.`);
+            });
+            return;
+        }
+        if (parsedTime < 0.25) {
+            console.log(`Randomize time must be at least 0.25 minutes (15 seconds). Given: ${time}`);
+            return;
+        }
         chrome.storage.local.set({ randomizeTime: parsedTime }, () => {
             console.log(`Randomize time set to ${parsedTime} minutes`);
             chrome.storage.local.get('toggleRandomizeOnSetTimeChecked', ({ toggleRandomizeOnSetTimeChecked }) => {
                 if (toggleRandomizeOnSetTimeChecked) {
+                    // Schedule a persistent alarm.
                     chrome.alarms.create('randomizeAlarm', {
-                        delayInMinutes: parsedTime,
                         periodInMinutes: parsedTime
                     });
                 }
@@ -215,8 +241,16 @@ function setRandomizeTime(time) {
     });
 }
 
-chrome.alarms.onAlarm.addListener(alarm => {
-    if (alarm.name === 'randomizeAlarm') runRandomization(selected =>
-            selected ? console.log('Randomization completed.') : console.log('Randomization failed.')
-        , 500);
+
+// In your alarm listener, pass a 1 second delay:
+chrome.alarms.onAlarm.addListener((alarm) => {
+    if (alarm.name === 'randomizeAlarm') {
+        runRandomization((selectedExtension) => {
+            if (selectedExtension) {
+                console.log('Randomization completed successfully.');
+            } else {
+                console.log('Randomization failed.');
+            }
+        }, 500); // Use half second delay for alarms
+    }
 });
