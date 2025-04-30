@@ -95,7 +95,24 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 
 function runStartupLogic() {
+    // 🔪 clear any missed alarm backlog
     chrome.alarms.clear('randomizeAlarm');
+
+    // 🔁 re-schedule the set-time alarm (with delayed first fire) if it was on
+    chrome.storage.local.get(
+        ['toggleRandomizeOnSetTimeChecked', 'randomizeTime'],
+        ({ toggleRandomizeOnSetTimeChecked, randomizeTime }) => {
+            const minutes = parseFloat(randomizeTime);
+            if (toggleRandomizeOnSetTimeChecked && minutes >= 0.25) {
+                chrome.alarms.create('randomizeAlarm', {
+                    delayInMinutes: minutes,
+                    periodInMinutes: minutes
+                });
+            }
+        }
+    );
+
+    // existing startup randomize + open-mods-tab logic
     chrome.storage.local.get(
         ['toggleRandomizeOnStartupChecked', 'modExtensionIds', 'toggleOpenModsTabChecked'],
         ({ toggleRandomizeOnStartupChecked, modExtensionIds = [], toggleOpenModsTabChecked }) => {
@@ -110,13 +127,6 @@ function runStartupLogic() {
             }
         }
     );
-    // NEW: Initialize randomize-on-set-time on startup
-    chrome.storage.local.get(['toggleRandomizeOnSetTimeChecked', 'randomizeTime'], ({ toggleRandomizeOnSetTimeChecked, randomizeTime }) => {
-        const parsedTime = parseFloat(randomizeTime);
-        if (toggleRandomizeOnSetTimeChecked && !isNaN(parsedTime) && parsedTime >= 0.25) {
-            setRandomizeTime(randomizeTime);
-        }
-    });
 }
 
 
@@ -216,6 +226,7 @@ function setRandomizeTime(time) {
         console.log(`Randomize time is not a number: ${time}`);
         return;
     }
+
     chrome.alarms.clear('randomizeAlarm', () => {
         if (parsedTime === 0) {
             chrome.storage.local.set({ randomizeTime: parsedTime }, () => {
@@ -227,12 +238,14 @@ function setRandomizeTime(time) {
             console.log(`Randomize time must be at least 0.25 minutes (15 seconds). Given: ${time}`);
             return;
         }
+
         chrome.storage.local.set({ randomizeTime: parsedTime }, () => {
             console.log(`Randomize time set to ${parsedTime} minutes`);
             chrome.storage.local.get('toggleRandomizeOnSetTimeChecked', ({ toggleRandomizeOnSetTimeChecked }) => {
                 if (toggleRandomizeOnSetTimeChecked) {
-                    // Schedule a persistent alarm.
+                    // Schedule a persistent alarm with delayed first fire
                     chrome.alarms.create('randomizeAlarm', {
+                        delayInMinutes: parsedTime,
                         periodInMinutes: parsedTime
                     });
                 }
