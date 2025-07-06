@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const toggleOpenModsTab = document.getElementById('toggleOpenModsTab');
     const toggleRandomizeOnSetTime = document.getElementById('toggleRandomizeOnSetTime');
     const timeInput = document.getElementById('timeInput');
+    const timeUnitSelect = document.getElementById('timeUnitSelect');
     const modForm = document.getElementById('modForm');
     const messageElement = document.getElementById('message');
     const searchBar = document.getElementById('searchBar');
@@ -58,8 +59,9 @@ document.addEventListener('DOMContentLoaded', () => {
         toggleRandomizeOnSetTime.addEventListener('change', () =>
             handleCheckboxChange('toggleRandomizeOnSetTimeChecked', toggleRandomizeOnSetTime.checked)
         );
-        // Use "change" so we don’t schedule multiple timeouts while typing.
+        // Use "change" so we donï¿½t schedule multiple timeouts while typing.
         timeInput.addEventListener('change', handleTimeInputChange);
+        timeUnitSelect.addEventListener('change', handleTimeUnitChange);
         extensionList.addEventListener('change', handleExtensionListChange);
         randomizeButton.addEventListener('click', handleRandomizeButtonClick);
         searchBar.addEventListener('input', handleSearchInput);
@@ -72,20 +74,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 'toggleRandomizeOnStartupChecked',
                 'toggleOpenModsTabChecked',
                 'toggleRandomizeOnSetTimeChecked',
-                'randomizeTime'
+                'randomizeTime',
+                'timeUnit'
             ],
             ({
                 autoModIdentificationChecked = false,
                 toggleRandomizeOnStartupChecked = false,
                 toggleOpenModsTabChecked = true,
                 toggleRandomizeOnSetTimeChecked = false,
-                randomizeTime = 0
+                randomizeTime = 0,
+                timeUnit = 'minutes'
             }) => {
                 toggleAutoModIdentification.checked = autoModIdentificationChecked;
                 toggleRandomizeOnStartup.checked = toggleRandomizeOnStartupChecked;
                 toggleOpenModsTab.checked = toggleOpenModsTabChecked;
                 toggleRandomizeOnSetTime.checked = toggleRandomizeOnSetTimeChecked;
                 timeInput.value = randomizeTime > 0 ? randomizeTime : '';
+                timeUnitSelect.value = timeUnit;
                 updateCheckboxes();
             }
         );
@@ -136,22 +141,58 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- FIX: Use alert for error if time < 0.25 ---
     function handleTimeInputChange() {
-        const time = parseFloat(timeInput.value);
+        const inputValue = parseFloat(timeInput.value);
+        const timeUnit = timeUnitSelect.value;
 
-        if (isNaN(time) || time === 0 || time === '') {
+        if (isNaN(inputValue) || inputValue === 0 || inputValue === '') {
             // Treat empty input as 0  
             messageElement.textContent = '';
             sendMessageToBackground('setRandomizeTime', { time: 0 });
             return;
         }
 
-        if (time < 0.25) {
-            alert('Randomize time must be at least 0.25 minutes (15 seconds) or 0 to disable.');
+        // Validate minimum values based on unit before conversion
+        let minValueMessage = '';
+        if (timeUnit === 'minutes' && inputValue < 0.25) {
+            minValueMessage = 'Randomize time must be at least 0.25 minutes (15 seconds) or 0 to disable.';
+        } else if ((timeUnit === 'hours' || timeUnit === 'days') && inputValue < 0.01) {
+            minValueMessage = `Randomize time must be at least 0.01 ${timeUnit} or 0 to disable.`;
+        }
+
+        if (minValueMessage) {
+            alert(minValueMessage);
             return;
         }
 
+        // Convert to minutes based on selected unit
+        let timeInMinutes = convertToMinutes(inputValue, timeUnit);
+
         messageElement.textContent = '';
-        sendMessageToBackground('setRandomizeTime', { time });
+        sendMessageToBackground('setRandomizeTime', { time: timeInMinutes });
+    }
+
+    function handleTimeUnitChange() {
+        const timeUnit = timeUnitSelect.value;
+        chrome.storage.local.set({ timeUnit }, () => {
+            console.log(`Time unit set to ${timeUnit}`);
+            // If there's a value in the time input, recalculate based on new unit
+            if (timeInput.value) {
+                handleTimeInputChange();
+            }
+        });
+    }
+
+    function convertToMinutes(value, unit) {
+        switch (unit) {
+            case 'minutes':
+                return value;
+            case 'hours':
+                return value * 60;
+            case 'days':
+                return value * 24 * 60;
+            default:
+                return value;
+        }
     }
 
     function updateCheckboxes(callback) {

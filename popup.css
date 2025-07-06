@@ -219,8 +219,14 @@ button {
     height: 60px; /* Restored to original size */
 }
 /* Hover effect for the time box */
-.time-setting-container input:hover {
+.time-setting-container input:hover,
+.time-setting-container input:hover + select {
     border-color: #007bff;
+}
+
+.time-setting-container select:hover {
+    border-color: #007bff;
+    border-left-color: #ccc;
 }
 
 /* Hover effect for the search box */
@@ -229,19 +235,48 @@ button {
 }
 .time-setting-container {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-top: 19px;
+    align-items: stretch;
+    margin-top: 0px;
     width: 100%;
     margin-bottom: -5px;
+    gap: 0;
+    height: 50px;
 }
 
     .time-setting-container input {
-        width: 100%;
-        padding: 0.5rem;
+        width: 70%;
+        padding: 0 0.5rem;
         border: 1px solid #ccc;
-        border-radius: 5px;
-        height: 35px;
+        border-radius: 5px 0 0 5px;
+        border-right: none;
+        /* Remove spinner buttons */
+        -moz-appearance: textfield;
+        box-sizing: border-box;
+        height: 55px;
+        line-height: 50px;
+    }
+
+    /* Remove spinner buttons for Chrome, Safari, Edge, Opera */
+    .time-setting-container input::-webkit-outer-spin-button,
+    .time-setting-container input::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+
+    .time-setting-container select {
+        width: 30%;
+        padding: 0 0.5rem;
+        border: 1px solid #ccc;
+        border-radius: 0 5px 5px 0;
+        background-color: #fff;
+        cursor: pointer;
+        box-sizing: border-box;
+        height: 55px;
+        line-height: 50px;
+    }
+
+    .time-setting-container select:hover {
+        border-color: #007bff;
     }
 .redirect-message {
     font-size: 16px;
@@ -391,10 +426,21 @@ input:checked + .slider:before {
     }
 
     /* Adjust the time input in dark mode */
-    .time-setting-container input {
+    .time-setting-container input,
+    .time-setting-container select {
         background-color: #444; /* Darker than #333 */
         color: #f5f5f5;
         border-color: #555;
+    }
+
+    .time-setting-container input:hover,
+    .time-setting-container input:hover + select {
+        border-color: #007bff;
+    }
+
+    .time-setting-container select:hover {
+        border-color: #007bff;
+        border-left-color: #555;
     }
 
     .manual-section {
