@@ -1,5 +1,6 @@
-let redirectTimeout = null; // NEW: To track redirection timer
+let redirectTimeout = null; // To track redirection timer
 let randomizeTimeout; // For recurring randomization
+let randomizationInProgress = false; // Lock to prevent parallel randomization processes
 
 chrome.runtime.onInstalled.addListener(() => {
     const initialSettings = {
@@ -101,9 +102,14 @@ function runStartupLogic() {
         ['toggleRandomizeOnStartupChecked', 'modExtensionIds', 'toggleOpenModsTabChecked'],
         ({ toggleRandomizeOnStartupChecked, modExtensionIds = [], toggleOpenModsTabChecked }) => {
             if (toggleRandomizeOnStartupChecked) {
-                executeRandomization('startup', () => {
-                    // Callback intentionally left empty as redirection is handled in executeRandomization
-                });
+                executeRandomization('startup', (selectedExtension) => {
+                    // Log the result of startup randomization
+                    if (selectedExtension) {
+                        console.log('Startup randomization completed successfully.');
+                    } else {
+                        console.log('Startup randomization skipped or failed.');
+                    }
+                }, 5000); // Use standard 5 second delay for startup
             }
         }
     );
@@ -130,6 +136,13 @@ function saveModExtensionIds(modExtensionIds) {
 // Modified runRandomization function accepts an optional redirectDelay (default: 5000 ms)
 // Single entry point for all randomization operations
 function executeRandomization(source = 'unknown', callback, redirectDelay = 5000) {
+    // Check if randomization is already in progress (except for manual randomization)
+    if (randomizationInProgress && source !== 'manual') {
+        console.log(`Skipping ${source} randomization - another randomization is already in progress`);
+        if (callback) callback(null);
+        return;
+    }
+
     // No need to log here as the specific sources (startup, alarm) already log their own messages
     const now = Date.now();
 
@@ -152,6 +165,10 @@ function executeRandomization(source = 'unknown', callback, redirectDelay = 5000
     });
 
     function proceedWithRandomization() {
+        // Set the lock at the beginning of randomization
+        if (source !== 'manual') {
+            randomizationInProgress = true;
+        }
 
         // Only update the last randomization time for non-manual sources
         const updateTimePromise = source !== 'manual' ?
@@ -171,13 +188,25 @@ function executeRandomization(source = 'unknown', callback, redirectDelay = 5000
                                     redirectTimeout = null;
                                 }, redirectDelay);
                             }
+                            // Release the lock after randomization completes
+                            if (source !== 'manual') {
+                                randomizationInProgress = false;
+                            }
                             if (callback) callback(selectedExtension, modExtensionIds);
                         } else {
+                            // Release the lock even if no extension was selected
+                            if (source !== 'manual') {
+                                randomizationInProgress = false;
+                            }
                             if (callback) callback(null, modExtensionIds);
                         }
                     });
                 } else {
                     console.log('No mod extensions found.');
+                    // Release the lock if no mod extensions were found
+                    if (source !== 'manual') {
+                        randomizationInProgress = false;
+                    }
                     if (callback) callback(null, modExtensionIds);
                 }
             });
