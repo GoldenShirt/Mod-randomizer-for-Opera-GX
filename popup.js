@@ -25,6 +25,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // Update currentMod on popup load
     updateCurrentMod();
 
+    // Store initial time unit as previous unit for future reference
+    chrome.storage.local.get('timeUnit', ({ timeUnit = 'minutes' }) => {
+        timeUnitSelect.dataset.previousUnit = timeUnit;
+    });
+
     // Listen for storage changes to update the currentMod element
     chrome.storage.onChanged.addListener((changes, area) => {
         if (area === 'local' && changes.currentMod) {
@@ -89,7 +94,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 toggleRandomizeOnStartup.checked = toggleRandomizeOnStartupChecked;
                 toggleOpenModsTab.checked = toggleOpenModsTabChecked;
                 toggleRandomizeOnSetTime.checked = toggleRandomizeOnSetTimeChecked;
-                timeInput.value = randomizeTime > 0 ? randomizeTime : '';
+
+                // Convert stored minutes back to the selected time unit
+                if (randomizeTime > 0) {
+                    timeInput.value = convertFromMinutes(randomizeTime, timeUnit);
+                } else {
+                    timeInput.value = '';
+                }
+
                 timeUnitSelect.value = timeUnit;
                 updateCheckboxes();
             }
@@ -172,12 +184,23 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function handleTimeUnitChange() {
-        const timeUnit = timeUnitSelect.value;
-        chrome.storage.local.set({ timeUnit }, () => {
-            console.log(`Time unit set to ${timeUnit}`);
-            // If there's a value in the time input, recalculate based on new unit
-            if (timeInput.value) {
-                handleTimeInputChange();
+        const oldUnit = timeUnitSelect.dataset.previousUnit || 'minutes';
+        const newUnit = timeUnitSelect.value;
+
+        // Update the previous unit data attribute
+        timeUnitSelect.dataset.previousUnit = newUnit;
+
+        // Store the new time unit in local storage
+        chrome.storage.local.set({ timeUnit: newUnit }, () => {
+            console.log(`Time unit set to ${newUnit}`);
+
+            // If there's a value in the time input, convert it to the new unit
+            if (timeInput.value && timeInput.value !== '') {
+                // First convert current display value to minutes based on old unit
+                const valueInMinutes = convertToMinutes(parseFloat(timeInput.value), oldUnit);
+
+                // Then convert from minutes to the new unit
+                timeInput.value = convertFromMinutes(valueInMinutes, newUnit);
             }
         });
     }
@@ -192,6 +215,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 return value * 24 * 60;
             default:
                 return value;
+        }
+    }
+
+    function convertFromMinutes(minutes, unit) {
+        switch (unit) {
+            case 'minutes':
+                return minutes;
+            case 'hours':
+                return (minutes / 60).toFixed(2);
+            case 'days':
+                return (minutes / (24 * 60)).toFixed(2);
+            default:
+                return minutes;
         }
     }
 
