@@ -242,14 +242,15 @@ button {
     margin-bottom: -5px;
     gap: 0;
     height: 50px;
+    flex-direction: row-reverse; /* Add this line */
 }
 
     .time-setting-container input {
         width: 70%;
         padding: 0 0.5rem;
         border: 1px solid #ccc;
-        border-radius: 5px 0 0 5px;
-        border-right: none;
+        border-radius: 0 5px 5px 0; /* Swap border radius */
+        border-left: none; /* Change from border-right to border-left */
         /* Remove spinner buttons */
         -moz-appearance: textfield;
         box-sizing: border-box;
@@ -258,18 +259,11 @@ button {
         font-size: 1.1rem;
     }
 
-    /* Remove spinner buttons for Chrome, Safari, Edge, Opera */
-    .time-setting-container input::-webkit-outer-spin-button,
-    .time-setting-container input::-webkit-inner-spin-button {
-        -webkit-appearance: none;
-        margin: 0;
-    }
-
     .time-setting-container select {
         width: 30%;
         padding: 0 0.5rem;
         border: 1px solid #ccc;
-        border-radius: 0 5px 5px 0;
+        border-radius: 5px 0 0 5px; /* Swap border radius */
         background-color: #fff;
         cursor: pointer;
         box-sizing: border-box;
