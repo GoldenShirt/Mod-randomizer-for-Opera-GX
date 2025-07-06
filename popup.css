@@ -34,7 +34,7 @@ fieldset {
     border: 1px solid #ccc;
     border-radius: 5px;
     padding: 1rem;
-    margin-bottom: 1rem;
+    margin-bottom: 5px;
 }
 
 legend {
@@ -53,7 +53,7 @@ legend {
 
 /* Option Container & Labels */
 .option-container {
-    font-size: 1rem;
+    font-size: 1.1rem;
 }
 
 label {
@@ -210,12 +210,13 @@ button {
 
 /* Specific Button & Input Sizes */
 #randomizeButton {
-    margin-top: -3px;
-    margin-bottom: 4px;
+    margin-top: 0px;
+    margin-bottom: 0px;
     padding: 12px;
     border: 2px solid #007bff;
     border-radius: 5px;
     font-weight: 600;
+    font-size: 1.1rem;
     height: 60px; /* Restored to original size */
 }
 /* Hover effect for the time box */
@@ -254,6 +255,7 @@ button {
         box-sizing: border-box;
         height: 55px;
         line-height: 50px;
+        font-size: 1.1rem;
     }
 
     /* Remove spinner buttons for Chrome, Safari, Edge, Opera */
@@ -273,6 +275,7 @@ button {
         box-sizing: border-box;
         height: 55px;
         line-height: 50px;
+        font-size: 1.1rem;
     }
 
     .time-setting-container select:hover {
@@ -300,7 +303,7 @@ button {
     background-color: #f0f0f0;
     padding: 0.5rem;
     border-radius: 5px;
-    margin-top: 1rem;
+    margin-top: 0px;
     margin-bottom: 0;
     min-height: 0;
 }
