@@ -95,6 +95,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 
 function runStartupLogic() {
+    console.log('Running startup logic');
     // existing startup randomize + open-mods-tab logic
     chrome.storage.local.get(
         ['toggleRandomizeOnStartupChecked', 'modExtensionIds', 'toggleOpenModsTabChecked'],
@@ -240,6 +241,7 @@ function setRandomizeTime(time) {
 // In your alarm listener, pass a 1 second delay:
 chrome.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name === 'randomizeAlarm') {
+        console.log('Running set time randomization');
         runRandomizationWithCooldown((selectedExtension) => {
             if (selectedExtension) {
                 console.log('Randomization completed successfully.');
