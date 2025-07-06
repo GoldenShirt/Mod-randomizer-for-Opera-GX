@@ -95,29 +95,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 
 function runStartupLogic() {
-    // 🔪 clear any missed alarm backlog
-    chrome.alarms.clear('randomizeAlarm');
-
-    // 🔁 re-schedule the set-time alarm (with delayed first fire) if it was on
-    chrome.storage.local.get(
-        ['toggleRandomizeOnSetTimeChecked', 'randomizeTime'],
-        ({ toggleRandomizeOnSetTimeChecked, randomizeTime }) => {
-            const minutes = parseFloat(randomizeTime);
-            if (toggleRandomizeOnSetTimeChecked && minutes >= 0.25) {
-                chrome.alarms.create('randomizeAlarm', {
-                    delayInMinutes: minutes,
-                    periodInMinutes: minutes
-                });
-            }
-        }
-    );
-
     // existing startup randomize + open-mods-tab logic
     chrome.storage.local.get(
         ['toggleRandomizeOnStartupChecked', 'modExtensionIds', 'toggleOpenModsTabChecked'],
         ({ toggleRandomizeOnStartupChecked, modExtensionIds = [], toggleOpenModsTabChecked }) => {
             if (toggleRandomizeOnStartupChecked) {
-                handleModExtensions(modExtensionIds, () => {
+                runRandomizationWithCooldown(() => {
                     if (toggleOpenModsTabChecked) {
                         setTimeout(() => {
                             chrome.tabs.create({ url: 'opera://mods/manage' });
@@ -128,7 +111,6 @@ function runStartupLogic() {
         }
     );
 }
-
 
 function identifyModExtensions(callback) {
     chrome.management.getAll(extensions => {
@@ -258,12 +240,52 @@ function setRandomizeTime(time) {
 // In your alarm listener, pass a 1 second delay:
 chrome.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name === 'randomizeAlarm') {
-        runRandomization((selectedExtension) => {
+        runRandomizationWithCooldown((selectedExtension) => {
             if (selectedExtension) {
                 console.log('Randomization completed successfully.');
             } else {
                 console.log('Randomization failed.');
             }
-        }, 500); // Use half second delay for alarms
+        });
     }
 });
+
+function runRandomizationWithCooldown(callback) {
+    const now = Date.now();
+    
+    chrome.storage.local.get('lastRandomizationTime', ({ lastRandomizationTime }) => {
+        // If less than 5 seconds have passed since last randomization, skip it
+        if (lastRandomizationTime && (now - lastRandomizationTime) < 5000) {
+            console.log('Skipping randomization - too soon after last randomization');
+            if (callback) callback();
+            return;
+        }
+        
+        // Store the current time and proceed with randomization
+        chrome.storage.local.set({ lastRandomizationTime: now }, () => {
+            chrome.storage.local.get(['modExtensionIds', 'toggleOpenModsTabChecked'], ({ modExtensionIds, toggleOpenModsTabChecked }) => {
+                if (modExtensionIds && modExtensionIds.length > 0) {
+                    handleModExtensions(modExtensionIds, (selectedExtension, modExtensionIds) => {
+                        if (selectedExtension) {
+                            chrome.storage.local.get('toggleOpenModsTabChecked', ({ toggleOpenModsTabChecked }) => {
+                                if (toggleOpenModsTabChecked) {
+                                    if (redirectTimeout) clearTimeout(redirectTimeout);
+                                    redirectTimeout = setTimeout(() => {
+                                        chrome.tabs.create({ url: 'opera://mods/manage' });
+                                        redirectTimeout = null;
+                                    }, 5000);
+                                }
+                            });
+                            if (callback) callback(selectedExtension, modExtensionIds);
+                        } else {
+                            if (callback) callback(null, modExtensionIds);
+                        }
+                    });
+                } else {
+                    console.log('No mod extensions found.');
+                    if (callback) callback(null, modExtensionIds);
+                }
+            });
+        });
+    });
+}
