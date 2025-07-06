@@ -32,7 +32,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             sendResponse({ status: 'success' });
             break;
         case 'randomizeMods':
-            runRandomization((selectedExtension, modExtensionIds) => {
+            executeRandomization('manual', (selectedExtension, modExtensionIds) => {
                 if (selectedExtension) {
                     sendResponse({
                         status: 'success',
@@ -101,12 +101,8 @@ function runStartupLogic() {
         ['toggleRandomizeOnStartupChecked', 'modExtensionIds', 'toggleOpenModsTabChecked'],
         ({ toggleRandomizeOnStartupChecked, modExtensionIds = [], toggleOpenModsTabChecked }) => {
             if (toggleRandomizeOnStartupChecked) {
-                runRandomizationWithCooldown(() => {
-                    if (toggleOpenModsTabChecked) {
-                        setTimeout(() => {
-                            chrome.tabs.create({ url: 'opera://mods/manage' });
-                        }, 5000);
-                    }
+                executeRandomization('startup', () => {
+                    // Callback intentionally left empty as redirection is handled in executeRandomization
                 });
             }
         }
@@ -132,32 +128,63 @@ function saveModExtensionIds(modExtensionIds) {
 }
 
 // Modified runRandomization function accepts an optional redirectDelay (default: 5000 ms)
-function runRandomization(callback, redirectDelay = 5000) {
-    chrome.storage.local.get(['modExtensionIds', 'toggleOpenModsTabChecked'], ({ modExtensionIds, toggleOpenModsTabChecked }) => {
-        if (modExtensionIds && modExtensionIds.length > 0) {
-            handleModExtensions(modExtensionIds, (selectedExtension, modExtensionIds) => {
-                if (selectedExtension) {
-                    // Use the passed redirectDelay for the redirection timeout
-                    chrome.storage.local.get('toggleOpenModsTabChecked', ({ toggleOpenModsTabChecked }) => {
-                        if (toggleOpenModsTabChecked) {
-                            if (redirectTimeout) clearTimeout(redirectTimeout);
-                            redirectTimeout = setTimeout(() => {
-                                chrome.tabs.create({ url: 'opera://mods/manage' });
-                                redirectTimeout = null;
-                            }, redirectDelay);
+// Single entry point for all randomization operations
+function executeRandomization(source = 'unknown', callback, redirectDelay = 5000) {
+    // No need to log here as the specific sources (startup, alarm) already log their own messages
+    const now = Date.now();
+
+    // For manual randomization, bypass the cooldown check completely
+    if (source === 'manual') {
+        // For manual randomization, proceed directly without cooldown check
+        proceedWithRandomization();
+        return;
+    }
+
+    chrome.storage.local.get('lastRandomizationTime', ({ lastRandomizationTime }) => {
+        // If less than 5 seconds have passed since last randomization, skip it
+        if (lastRandomizationTime && (now - lastRandomizationTime) < 5000) {
+            console.log(`Skipping ${source} randomization - too soon after last randomization`);
+            if (callback) callback(null);
+            return;
+        }
+
+        proceedWithRandomization();
+    });
+
+    function proceedWithRandomization() {
+
+        // Only update the last randomization time for non-manual sources
+        const updateTimePromise = source !== 'manual' ?
+            new Promise(resolve => chrome.storage.local.set({ lastRandomizationTime: now }, resolve)) :
+            Promise.resolve();
+
+        updateTimePromise.then(() => {
+            chrome.storage.local.get(['modExtensionIds', 'toggleOpenModsTabChecked'], ({ modExtensionIds, toggleOpenModsTabChecked }) => {
+                if (modExtensionIds && modExtensionIds.length > 0) {
+                    handleModExtensions(modExtensionIds, (selectedExtension, modExtensionIds) => {
+                        if (selectedExtension) {
+                            // Handle redirection to mods page if setting enabled
+                            if (toggleOpenModsTabChecked) {
+                                if (redirectTimeout) clearTimeout(redirectTimeout);
+                                redirectTimeout = setTimeout(() => {
+                                    chrome.tabs.create({ url: 'opera://mods/manage' });
+                                    redirectTimeout = null;
+                                }, redirectDelay);
+                            }
+                            if (callback) callback(selectedExtension, modExtensionIds);
+                        } else {
+                            if (callback) callback(null, modExtensionIds);
                         }
                     });
-                    if (callback) callback(selectedExtension, modExtensionIds);
                 } else {
+                    console.log('No mod extensions found.');
                     if (callback) callback(null, modExtensionIds);
                 }
             });
-        } else {
-            console.log('No mod extensions found.');
-            if (callback) callback(null, modExtensionIds);
-        }
-    });
+        });
+            }
 }
+
 function handleModExtensions(modExtensionIds, callback) {
     chrome.storage.local.get(['lastEnabledModId'], ({ lastEnabledModId }) => {
         chrome.management.getAll(extensions => {
@@ -238,56 +265,18 @@ function setRandomizeTime(time) {
 }
 
 
-// In your alarm listener, pass a 1 second delay:
+// In your alarm listener, use a shorter redirect delay
 chrome.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name === 'randomizeAlarm') {
         console.log('Running set time randomization');
-        runRandomizationWithCooldown((selectedExtension) => {
+        executeRandomization('alarm', (selectedExtension) => {
             if (selectedExtension) {
                 console.log('Randomization completed successfully.');
             } else {
                 console.log('Randomization failed.');
             }
-        });
+        }, 500); // Use shorter delay for alarm-triggered randomization
     }
 });
 
-function runRandomizationWithCooldown(callback) {
-    const now = Date.now();
-    
-    chrome.storage.local.get('lastRandomizationTime', ({ lastRandomizationTime }) => {
-        // If less than 5 seconds have passed since last randomization, skip it
-        if (lastRandomizationTime && (now - lastRandomizationTime) < 5000) {
-            console.log('Skipping randomization - too soon after last randomization');
-            if (callback) callback();
-            return;
-        }
-        
-        // Store the current time and proceed with randomization
-        chrome.storage.local.set({ lastRandomizationTime: now }, () => {
-            chrome.storage.local.get(['modExtensionIds', 'toggleOpenModsTabChecked'], ({ modExtensionIds, toggleOpenModsTabChecked }) => {
-                if (modExtensionIds && modExtensionIds.length > 0) {
-                    handleModExtensions(modExtensionIds, (selectedExtension, modExtensionIds) => {
-                        if (selectedExtension) {
-                            chrome.storage.local.get('toggleOpenModsTabChecked', ({ toggleOpenModsTabChecked }) => {
-                                if (toggleOpenModsTabChecked) {
-                                    if (redirectTimeout) clearTimeout(redirectTimeout);
-                                    redirectTimeout = setTimeout(() => {
-                                        chrome.tabs.create({ url: 'opera://mods/manage' });
-                                        redirectTimeout = null;
-                                    }, 5000);
-                                }
-                            });
-                            if (callback) callback(selectedExtension, modExtensionIds);
-                        } else {
-                            if (callback) callback(null, modExtensionIds);
-                        }
-                    });
-                } else {
-                    console.log('No mod extensions found.');
-                    if (callback) callback(null, modExtensionIds);
-                }
-            });
-        });
-    });
-}
+// Function removed - replaced by executeRandomization
