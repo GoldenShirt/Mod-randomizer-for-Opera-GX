@@ -237,7 +237,7 @@ button {
 .time-setting-container {
     display: flex;
     align-items: stretch;
-    margin-top: 0px;
+    margin-top: -5px;
     width: 100%;
     margin-bottom: -5px;
     gap: 0;
