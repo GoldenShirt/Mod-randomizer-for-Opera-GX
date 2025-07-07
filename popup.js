@@ -64,7 +64,7 @@ document.addEventListener('DOMContentLoaded', () => {
         toggleRandomizeOnSetTime.addEventListener('change', () =>
             handleCheckboxChange('toggleRandomizeOnSetTimeChecked', toggleRandomizeOnSetTime.checked)
         );
-        // Use "change" so we don�t schedule multiple timeouts while typing.
+        // Use "change" so we don't schedule multiple timeouts while typing.
         timeInput.addEventListener('change', handleTimeInputChange);
         timeUnitSelect.addEventListener('change', handleTimeUnitChange);
         extensionList.addEventListener('change', handleExtensionListChange);
@@ -151,7 +151,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // --- FIX: Use alert for error if time < 0.25 ---
     function handleTimeInputChange() {
         const inputValue = parseFloat(timeInput.value);
         const timeUnit = timeUnitSelect.value;
@@ -163,12 +162,21 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        // Allow 0.25 for testing purposes when unit is minutes
+        if (timeUnit === 'minutes' && inputValue === 0.25) {
+            // Special case: allow 0.25 minutes for testing
+            let timeInMinutes = convertToMinutes(inputValue, timeUnit);
+            messageElement.textContent = '';
+            sendMessageToBackground('setRandomizeTime', { time: timeInMinutes });
+            return;
+        }
+
         // Validate minimum values based on unit before conversion
         let minValueMessage = '';
-        if (timeUnit === 'minutes' && inputValue < 0.25) {
-            minValueMessage = 'Randomize time must be at least 0.25 minutes (15 seconds) or 0 to disable.';
-        } else if ((timeUnit === 'hours' || timeUnit === 'days') && inputValue < 0.01) {
-            minValueMessage = `Randomize time must be at least 0.01 ${timeUnit} or 0 to disable.`;
+        if (timeUnit === 'minutes' && inputValue < 1) {
+            minValueMessage = 'Randomize time must be at least 1 minute (or 0.25 for testing) or 0 to disable.';
+        } else if ((timeUnit === 'hours' || timeUnit === 'days') && inputValue < 1) {
+            minValueMessage = `Randomize time must be at least 1 ${timeUnit} or 0 to disable.`;
         }
 
         if (minValueMessage) {
