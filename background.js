@@ -1,21 +1,34 @@
+const MAX_LAST_RANDOMIZATION_AGE = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
 let redirectTimeout = null; // To track redirection timer
 let randomizeTimeout; // For recurring randomization
 let randomizationInProgress = false; // Lock to prevent parallel randomization processes
 
-chrome.runtime.onInstalled.addListener(() => {
-    const initialSettings = {
-        modExtensionIds: [],
-        toggleRandomizeOnStartupChecked: false,
-        autoModIdentificationChecked: true,
-        toggleOpenModsTabChecked: true,
-        toggleRandomizeOnSetTimeChecked: false,
-        randomizeTime: 0,
-        currentMod: "None"
-    };
-    chrome.storage.local.set(initialSettings, () => {
-        console.log('Mod Randomizer: Installed with settings:', initialSettings);
-        identifyModExtensions();
-    });
+chrome.runtime.onInstalled.addListener((details) => {
+    if (details.reason === 'install') {
+        const initialSettings = {
+            modExtensionIds: [],
+            toggleRandomizeOnStartupChecked: false,
+            autoModIdentificationChecked: true,
+            toggleOpenModsTabChecked: true,
+            toggleRandomizeOnSetTimeChecked: false,
+            randomizeTime: 0,
+            currentMod: "None"
+        };
+        chrome.storage.local.set(initialSettings, () => {
+            console.log('Mod Randomizer: Installed with settings:', initialSettings);
+            identifyModExtensions();
+        });
+    } else if (details.reason === 'update') {
+        console.log('Mod Randomizer: Extension updated, preserving existing settings');
+        // Only run mod identification if auto mod identification is enabled
+        chrome.storage.local.get('autoModIdentificationChecked', ({ autoModIdentificationChecked }) => {
+            if (autoModIdentificationChecked) {
+                identifyModExtensions();
+            } else {
+                console.log('Auto mod identification is disabled, preserving user\'s custom mod list');
+            }
+        });
+    }
 });
 
 chrome.runtime.onStartup.addListener(runStartupLogic);
@@ -133,8 +146,7 @@ function saveModExtensionIds(modExtensionIds) {
     });
 }
 
-// Modified runRandomization function accepts an optional redirectDelay (default: 5000 ms)
-// Single entry point for all randomization operations
+// Modified executeRandomization function
 function executeRandomization(source = 'unknown', callback, redirectDelay = 5000) {
     // Check if randomization is already in progress (except for manual randomization)
     if (randomizationInProgress && source !== 'manual') {
@@ -154,6 +166,14 @@ function executeRandomization(source = 'unknown', callback, redirectDelay = 5000
     }
 
     chrome.storage.local.get('lastRandomizationTime', ({ lastRandomizationTime }) => {
+        // Clean up old lastRandomizationTime if it's older than 24 hours
+        if (lastRandomizationTime && (now - lastRandomizationTime) > MAX_LAST_RANDOMIZATION_AGE) {
+            chrome.storage.local.remove('lastRandomizationTime', () => {
+                console.log('Cleaned up old lastRandomizationTime value');
+            });
+            lastRandomizationTime = null;
+        }
+
         // If less than 5 seconds have passed since last randomization, skip it
         if (lastRandomizationTime && (now - lastRandomizationTime) < 5000) {
             console.log(`Skipping ${source} randomization - too soon after last randomization`);
@@ -211,7 +231,7 @@ function executeRandomization(source = 'unknown', callback, redirectDelay = 5000
                 }
             });
         });
-            }
+    }
 }
 
 function handleModExtensions(modExtensionIds, callback) {
@@ -307,5 +327,3 @@ chrome.alarms.onAlarm.addListener((alarm) => {
         }, 500); // Use shorter delay for alarm-triggered randomization
     }
 });
-
-// Function removed - replaced by executeRandomization
