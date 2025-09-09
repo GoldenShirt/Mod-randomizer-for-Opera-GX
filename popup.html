@@ -8,64 +8,84 @@
     <title>Mod Randomizer</title>
 </head>
 <body>
-    <div class="popup-container">
-        <h2>Mod Randomizer</h2>
-        <p id="current-mod">Current Mod: None</p>
-        <form id="modForm">
-            <!-- Automatic Controls Section -->
-            <fieldset class="auto-section">
-                <legend>Automatic Controls</legend>
-                <div class="option-container">
-                    <label class="switch-label" title="Enable automatic mod detection">
-                        <span>Automatic Mod Identification</span>
-                        <label class="switch">
-                            <input type="checkbox" id="toggleAutoModIdentification">
-                            <span class="slider"></span>
-                        </label>
+<div class="popup-container">
+    <h2>Mod Randomizer</h2>
+    <p id="current-mod">Current Mod: None</p>
+
+    <form id="modForm">
+        <!-- Profile Management Section -->
+        <fieldset class="profile-section">
+            <legend>Profiles</legend>
+            <select id="profileSelect">
+                <option value="Default">Default</option>
+            </select>
+            <div class="profile-buttons">
+                <button type="button" id="newProfileBtn">+ New</button>
+                <button type="button" id="deleteProfileBtn">Delete</button>
+            </div>
+        </fieldset>
+
+        <!-- Automatic Controls -->
+        <fieldset class="auto-section">
+            <legend>Automatic Controls</legend>
+            <div class="option-container">
+                <label class="switch-label">
+                    <span>Automatic Mod Identification</span>
+                    <label class="switch">
+                        <input type="checkbox" id="toggleAutoModIdentification">
+                        <span class="slider"></span>
                     </label>
-                    <label class="switch-label" title="Automatically open mods tab">
-                        <span>Open mods tab</span>
-                        <label class="switch">
-                            <input type="checkbox" id="toggleOpenModsTab">
-                            <span class="slider"></span>
-                        </label>
+                </label>
+
+                <label class="switch-label">
+                    <span>Open mods tab</span>
+                    <label class="switch">
+                        <input type="checkbox" id="toggleOpenModsTab">
+                        <span class="slider"></span>
                     </label>
-                    <label class="switch-label" title="Randomize mod when OperaGX starts">
-                        <span>Randomize on OperaGX startup</span>
-                        <label class="switch">
-                            <input type="checkbox" id="toggleRandomizeOnStartup">
-                            <span class="slider"></span>
-                        </label>
+                </label>
+
+                <label class="switch-label">
+                    <span>Randomize on OperaGX startup</span>
+                    <label class="switch">
+                        <input type="checkbox" id="toggleRandomizeOnStartup">
+                        <span class="slider"></span>
                     </label>
-                    <label class="switch-label" title="Enable time-based randomization">
-                        <span>Randomize Mods on Set Time</span>
-                        <label class="switch">
-                            <input type="checkbox" id="toggleRandomizeOnSetTime">
-                            <span class="slider"></span>
-                        </label>
+                </label>
+
+                <label class="switch-label">
+                    <span>Randomize Mods on Set Time</span>
+                    <label class="switch">
+                        <input type="checkbox" id="toggleRandomizeOnSetTime">
+                        <span class="slider"></span>
                     </label>
-                    <div class="time-setting-container">
-                        <input type="number" id="timeInput" min="1" step="1" placeholder="Enter time value">
-                        <select id="timeUnitSelect">
-                            <option value="minutes">Minutes</option>
-                            <option value="hours">Hours</option>
-                            <option value="days">Days</option>
-                        </select>
-                    </div>
+                </label>
+
+                <div class="time-setting-container">
+                    <input type="number" id="timeInput" min="1" step="1" placeholder="Enter time">
+                    <select id="timeUnitSelect">
+                        <option value="minutes">Minutes</option>
+                        <option value="hours">Hours</option>
+                        <option value="days">Days</option>
+                    </select>
                 </div>
-            </fieldset>
-            <button id="randomizeButton" type="button">Randomize</button>
-            <hr>
-            <!-- Manual Controls Section -->
-            <fieldset class="manual-section">
-                <legend>Manual Mod Selection</legend>
-                <p class="section-note">Disable Automatic Mod Identification to edit</p>
-                <input type="text" id="searchBar" placeholder="Search mods..." title="Search available mods">
-                <ul id="extensionList"></ul>
-            </fieldset>
-            <div id="message"></div>
-        </form>
-    </div>
-    <script src="popup.js"></script>
+            </div>
+        </fieldset>
+
+        <!-- Randomize Button -->
+        <button id="randomizeButton" type="button">🎲 Randomize</button>
+        <hr id="message-hr" />
+
+        <!-- Manual Controls -->
+        <fieldset class="manual-section">
+            <legend>Manual Mod Selection</legend>
+            <input type="text" id="searchBar" placeholder="Search mods...">
+            <ul id="extensionList"></ul>
+        </fieldset>
+
+        <div id="message"></div>
+    </form>
+</div>
+<script src="popup.js"></script>
 </body>
 </html>

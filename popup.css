@@ -1,446 +1,374 @@
-/* Universal Styles (Sizes, Layouts, etc.) */
-
-/* Base Body & Container */
+/* ===== Base Layout ===== */
 body {
-    width: 22rem;
-    padding: 0;
-    font-family: 'Arial', sans-serif;
-    overflow-y: auto;
-    background-color: #f5f5f5;
-    color: #333;
+    width: 24rem;
+    margin: 0;
+    font-family: "Segoe UI", Arial, sans-serif;
+    background-color: #1a1a1d;
+    color: #f5f5f5;
+    font-size: 15px; /* slightly bigger globally */
 }
 
 .popup-container {
-    padding: 0.5rem;
+    padding: 1rem;
 }
 
-/* Headings & Text */
+/* ===== Headings ===== */
 h2 {
-    margin-top: 0;
     text-align: center;
-    margin-bottom: 1rem;
     font-size: 1.6rem;
-    font-weight: bold;
+    color: #00d4ff;
+    margin: 0;
 }
 
 #current-mod {
-    font-size: 1.5em;
     text-align: center;
-    margin-top: -8px;
+    font-size: 1.1rem;
+    margin: 0.25rem 0 1rem 0;
+    color: #ff4081;
 }
 
-/* Fieldset & Legends */
+/* ===== Fieldsets ===== */
 fieldset {
-    border: 1px solid #ccc;
-    border-radius: 5px;
-    padding: 1rem;
-    margin-bottom: 5px;
+    border: 1px solid #333;
+    border-radius: 8px;
+    padding: 0.9rem;
+    margin-bottom: 0.6rem; /* tighter spacing */
+    background-color: #222;
 }
 
 legend {
+    color: #00d4ff;
     font-weight: bold;
-    color: #007bff;
     padding: 0 0.5rem;
+    font-size: 1rem;
 }
 
-/* Section Notes */
-.section-note {
-    font-size: 0.9rem;
-    text-align: center;
-    margin: 0.5rem auto 1rem;
+/* ===== Profiles ===== */
+.profile-section {
+    padding: 0.6rem;
+    margin-bottom: 0;
+
+}
+
+#profileSelect {
     width: 100%;
+    padding: 0.6rem;
+    border-radius: 6px;
+    border: 1px solid #444;
+    background-color: #111;
+    color: #f5f5f5;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: border-color 0.2s, box-shadow 0.2s;
 }
 
-/* Option Container & Labels */
-.option-container {
-    font-size: 1.1rem;
+#profileSelect:hover,
+#profileSelect:focus {
+    border-color: #00d4ff;
+    box-shadow: 0 0 6px #00d4ff;
 }
 
-label {
-    display: block;
-    margin-bottom: 10px;
-    vertical-align: middle;
-    font-weight: 500;
+.profile-buttons {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
 }
 
-/* Scrollbar (Size) */
-::-webkit-scrollbar {
-    width: 14px;
-}
-
-::-webkit-scrollbar-track {
-    background: #dcdcdc;
-    border-radius: 7px;
-}
-
-::-webkit-scrollbar-thumb {
-    background: #a6a6a6;
-    border-radius: 7px;
-    border: 3px solid #dcdcdc;
-}
-
-    ::-webkit-scrollbar-thumb:hover {
-        background: #888;
-    }
-
-/* List Styles */
-ul {
-    list-style-type: none;
-    padding-inline-start: 0;
-    margin: 1rem 0;
-}
-
-li {
-    padding: 0.75rem;
+.profile-buttons button {
+    flex: 1;
+    padding: 0.5rem;
+    font-size: 0.95rem;
+    border: none;
     border-radius: 5px;
-    margin-bottom: 10px;
-    transition: background 0.3s;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    background-color: #333;
+    color: #f5f5f5;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
 }
 
-    li:nth-child(1n) {
-        background: #e6e6e6;
-    }
+.profile-buttons button:hover {
+    background-color: #00d4ff;
+    color: #111;
+}
 
-    li:hover {
-        background: #d0d0d0;
-    }
+/* ===== Automatic Controls ===== */
+.auto-section {
+    padding: 0.6rem;
+    font-size: 1rem;
+}
 
-/* Switch Styles */
 .switch-label {
     display: flex;
-    align-items: center;
     justify-content: space-between;
-    margin-bottom: 15px;
-    font-weight: 500;
+    align-items: center;
+    margin-bottom: 0.6rem;
 }
 
+.switch-label:hover {
+    color: #00d4ff;
+}
+
+/* Switch styling */
 .switch {
     position: relative;
     display: inline-block;
-    width: 40px;
-    height: 24px;
-    margin-bottom: -1px;
+    width: 44px;
+    height: 22px;
 }
 
-    .switch input {
-        opacity: 0;
-        width: 0;
-        height: 0;
-    }
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
 
 .slider {
     position: absolute;
-    cursor: pointer;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: #ccc;
-    transition: .4s;
-    border-radius: 24px;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-color: #444;
+    border-radius: 20px;
+    transition: 0.3s;
 }
 
-    .slider:before {
-        position: absolute;
-        content: "";
-        height: 20px;
-        width: 20px;
-        left: 2px;
-        bottom: 2px;
-        background-color: white;
-        transition: .4s;
-        border-radius: 50%;
-    }
-
-/* Input & Button (Sizes & Layout) */
-input[type="checkbox"],
-button {
-    appearance: none;
-    outline: none;
-    vertical-align: middle;
-    cursor: pointer;
-    transition: background 0.3s, border 0.3s;
-}
-
-input[type="checkbox"] {
-    margin-right: 8px;
-    position: relative;
-    top: -1px;
-    width: 30px;
-    height: 30px;
-    border: 1px solid #ccc;
-    border-radius: 3px;
+.slider:before {
+    content: "";
+    position: absolute;
+    height: 18px; width: 18px;
+    left: 2px; bottom: 2px;
     background-color: #fff;
-}
-    input[type="checkbox"]:checked {
-        background-color: #007bff; /* Blue background */
-        border-color: #007bff; /* Blue border */
-        color: white; /* White checkmark */
-    }
-    input[type="checkbox"]:hover:not(:disabled) {
-        border-color: #007bff;
-    }
-
-    input[type="checkbox"]:checked:hover:not(:disabled) {
-        background-color: #0056b3;
-    }
-
-    input[type="checkbox"]:disabled {
-        cursor: not-allowed;
-    }
-
-button {
-    width: 100%;
-    cursor: pointer;
-    padding: 10px;
-    border: 2px solid #ccc;
-    border-radius: 5px;
-    background-color: #007bff;
-    color: #fff;
-    font-weight: 500;
+    border-radius: 50%;
+    transition: 0.3s;
 }
 
-    button:hover {
-        background-color: #0056b3;
-        border-color: #0056b3;
-    }
-
-/* Specific Button & Input Sizes */
-#randomizeButton {
-    margin-top: 0px;
-    margin-bottom: 0px;
-    padding: 12px;
-    border: 2px solid #007bff;
-    border-radius: 5px;
-    font-weight: 600;
-    font-size: 1.1rem;
-    height: 60px; /* Restored to original size */
-}
-/* Hover effect for the time box */
-.time-setting-container input:hover,
-.time-setting-container input:hover + select {
-    border-color: #007bff;
-}
-
-.time-setting-container select:hover {
-    border-color: #007bff;
-    border-left-color: #ccc;
-}
-
-/* Hover effect for the search box */
-#searchBar:hover {
-    border-color: #007bff;
-}
-.time-setting-container {
-    display: flex;
-    align-items: stretch;
-    margin-top: -5px;
-    width: 100%;
-    margin-bottom: -5px;
-    gap: 0;
-    height: 50px;
-}
-
-    .time-setting-container input {
-        width: 70%; /* Increased from 70% to 80% */
-        padding: 0 0.5rem;
-        border: 1px solid #ccc;
-        border-radius: 5px 0 0 5px;
-        border-right: none;
-        margin-left: auto; /* Add this line */
-        /* Remove spinner buttons */
-        -moz-appearance: textfield;
-        box-sizing: border-box;
-        height: 55px;
-        line-height: 50px;
-        font-size: 1.1rem;
-    }
-
-    .time-setting-container select {
-        width: 30%;
-        padding: 0 0.5rem;
-        border: 1px solid #ccc;
-        border-radius: 0 5px 5px 0;
-        background-color: #fff;
-        cursor: pointer;
-        box-sizing: border-box;
-        height: 55px;
-        line-height: 50px;
-        font-size: 1.1rem;
-    }
-
-    .time-setting-container select:hover {
-        border-color: #007bff;
-    }
-.redirect-message {
-    font-size: 16px;
-    color: #007bff;
-    text-align: center;
-    margin-top: 10px;
-}
-  
-#searchBar {
-    width: 95%; /* Slightly less wide */
-    height: 30px;
-    padding: 0.5rem;
-    margin-bottom: 0;
-    border: 1px solid #ccc;
-    border-radius: 5px;
-    margin-left: 0rem; /* As before */
-}
-
-/* Manual Section Adjustments */
-.manual-section {
-    background-color: #f0f0f0;
-    padding: 0.5rem;
-    border-radius: 5px;
-    margin-top: 0px;
-    margin-bottom: 0;
-    min-height: 0;
-}
-
-    /* Disabled Manual Section (when auto mod is enabled) */
-    .manual-section.disabled,
-    .manual-section.disabled * {
-        opacity: 0.5;
-        pointer-events: none;
-    }
-
-/* Message */
-#enabledMessage {
-    font-size: 18px;
-    margin: 10px 0;
-    color: #28a745; /* Green-like color */
-    text-align: center;
-}
-.mod-name {
-    color: #ff5722; /* Orange-like color */
-}
-/* Slider & Checkbox Interactions */
 input:checked + .slider {
-    background-color: #007bff;
-}
-
-input:focus + .slider {
-    box-shadow: 0 0 1px #007bff;
+    background-color: #00d4ff;
 }
 
 input:checked + .slider:before {
-    transform: translateX(16px);
+    transform: translateX(22px);
 }
 
 .switch:hover .slider {
-    background-color: #0056b3;
+    box-shadow: 0 0 6px #00d4ff;
 }
 
-/* Dark Mode Overrides (Colors Only) */
-@media (prefers-color-scheme: dark) {
-    body {
-        background-color: #1e1e1e;
-        color: #f5f5f5;
-    }
+/* Time input */
+.time-setting-container {
+    display: flex;
+    margin-top: 0.5rem;
+    height: 45px;
 
-    ::-webkit-scrollbar-track {
-        background: #2e2e2e;
-    }
+}
 
-    ::-webkit-scrollbar-thumb {
-        background: #555;
-        border-color: #2e2e2e;
-    }
+.time-setting-container input,
+.time-setting-container select {
+    flex: 1;
+    padding: 0.5rem;
+    border: 1px solid #444;
+    background-color: #111;
+    color: #f5f5f5;
+    font-size: 1rem;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
 
-    li:nth-child(1n) {
-        background: #333333;
-    }
+.time-setting-container input {
+    border-radius: 6px 0 0 6px;
+}
 
-    li:hover {
-        background: #444444;
-    }
+.time-setting-container select {
+    border-left: none;
+    border-radius: 0 6px 6px 0;
+}
 
-    input[type="checkbox"] {
-        border: 1px solid #666;
-        background-color: #2e2e2e;
-    }
+.time-setting-container input:hover,
+.time-setting-container select:hover,
+.time-setting-container input:focus,
+.time-setting-container select:focus {
+    border-color: #00d4ff;
+    box-shadow: 0 0 6px #00d4ff;
+}
 
-        input[type="checkbox"]:checked {
-            background-color: #007bff;
-        }
+/* ===== Randomize button ===== */
+#randomizeButton {
+    display: block;
+    width: 100%;
+    padding: 1rem;
+    font-size: 1.2rem;
+    font-weight: bold;
+    background-color: #ff4081;
+    color: #fff;
+    border: 2px solid transparent;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
+}
 
-        input[type="checkbox"]:hover:not(:disabled) {
-            border-color: #007bff;
-        }
+#randomizeButton:hover {
+    background-color: #ff79a1;
+    border-color: #ff4081;
+    box-shadow: 0 0 8px #ff4081;
+}
 
-        input[type="checkbox"]:checked:hover:not(:disabled) {
-            background-color: #0056b3;
-        }
+/* ===== Manual Mods ===== */
+.manual-section {
+    position: relative; /* needed for overlay */
+    padding: 0.8rem;
+    border-radius: 8px;
+    overflow: visible;
+}
 
-    button {
-        background-color: #007bff;
-        color: #e0e0e0;
-        border-color: #444;
-    }
+/* Search bar */
+#searchBar {
+    width: 95%; /* prevent spilling out */
+    max-width: 100%;
+    padding: 0.6rem;
+    margin-bottom: 0.6rem;
+    border-radius: 6px;
+    border: 1px solid #444;
+    background-color: #111;
+    color: #f5f5f5;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+}
 
-        button:hover {
-            background-color: #0056b3;
-            border-color: #0056b3;
-        }
+#searchBar:hover,
+#searchBar:focus {
+    border-color: #00d4ff;
+    box-shadow: 0 0 6px #00d4ff;
+}
 
-    .slider {
-        background-color: #555555;
-    }
+#extensionList {
+    max-height: 200px;
+    overflow-y: auto;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    position: relative;
+}
 
-        .slider:before {
-            background-color: #888888;
-        }
+/* Custom checkboxes */
+#extensionList li {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.4rem 0.5rem;
+    border-bottom: 1px solid #333;
+}
 
-    input:checked + .slider {
-        background-color: #007bff;
-    }
+#extensionList input[type="checkbox"] {
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border: 2px solid #00d4ff;
+    border-radius: 4px;
+    background-color: transparent;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.2s;
+}
 
-        input:checked + .slider:before {
-            background-color: #ffffff;
-        }
-    hr {
-        border-color: #555; /* Adjust this value as needed */
-    }
-    .switch:hover .slider {
-        background-color: #0056b3;
-    }
-    .time-setting-container input:hover {
-        border-color: #007bff;
-    }
+#extensionList input[type="checkbox"]:checked {
+    background-color: #00d4ff;
+}
 
-    #searchBar:hover {
-        border-color: #007bff;
-    }
-    #searchBar {
-        background-color: #333;
-        color: #f5f5f5;
-        border-color: #555;
-    }
+#extensionList input[type="checkbox"]:hover {
+    transform: scale(1.1);
+}
 
-    /* Adjust the time input in dark mode */
-    .time-setting-container input,
-    .time-setting-container select {
-        background-color: #444; /* Darker than #333 */
-        color: #f5f5f5;
-        border-color: #555;
-    }
+/* Darken whole fieldset area, including behind the legend */
+.manual-section.disabled::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: -0.9em;          /* extend up to cover legend area */
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.75);
+    pointer-events: none;
+    border-radius: 8px;
+    z-index: 2;
+}
 
-    .time-setting-container input:hover,
-    .time-setting-container input:hover + select {
-        border-color: #007bff;
-    }
 
-    .time-setting-container select:hover {
-        border-color: #007bff;
-        border-left-color: #555;
-    }
+/* Message layer above blackout */
+.manual-section.disabled::after {
+    content: "Automatic Mod Identification is enabled";
+    position: absolute;
+    inset: 0;
+    color: #aaa;
+    font-size: 0.9rem;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    pointer-events: none;
+    border-radius: 8px;
+    padding: 1rem;
+    box-sizing: border-box;
+    z-index: 3;
+}
 
-    .manual-section {
-        background-color: #2e2e2e;
-    }
+
+/* Legend on top, no background */
+.manual-section legend {
+    position: relative;
+    z-index: 4;      /* keep text above overlays */
+    background: transparent;
+}
+
+
+
+/* Custom checkboxes */
+#extensionList li {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.4rem 0.5rem;
+    border-bottom: 1px solid #333;
+}
+
+#extensionList input[type="checkbox"] {
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border: 2px solid #00d4ff;
+    border-radius: 4px;
+    background-color: transparent;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.2s;
+}
+
+#extensionList input[type="checkbox"]:checked {
+    background-color: #00d4ff;
+}
+
+#extensionList input[type="checkbox"]:hover {
+    transform: scale(1.1);
+}
+
+/* ===== Messages ===== */
+#enabledMessage {
+    font-size: 1rem;
+    text-align: center;
+    color: #4caf50;
+    margin: 0.6rem 0;
+}
+
+.redirect-message {
+    font-size: 0.9rem;
+    text-align: center;
+    color: #00d4ff;
+}
+
+/* ===== Scrollbar ===== */
+::-webkit-scrollbar {
+    width: 8px;
+}
+::-webkit-scrollbar-thumb {
+    background-color: #555;
+    border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background-color: #888;
 }
