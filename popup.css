@@ -304,7 +304,7 @@ input:checked + .slider:before {
 
 /* Message layer above blackout */
 .manual-section.disabled::after {
-    content: "Automatic Mod Identification is enabled";
+    content: "Shuffle all mods is enabled";
     position: absolute;
     inset: 0;
     color: #aaa;

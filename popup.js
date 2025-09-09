@@ -14,7 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
         newProfileBtn: document.getElementById('newProfileBtn'),
         deleteProfileBtn: document.getElementById('deleteProfileBtn'),
 
-        autoModToggle: document.getElementById('toggleAutoModIdentification'),
+        autoModToggle: document.getElementById('shuffleAllMods'),
         openModsToggle: document.getElementById('toggleOpenModsTab'),
         startupToggle: document.getElementById('toggleRandomizeOnStartup'),
         setTimeToggle: document.getElementById('toggleRandomizeOnSetTime'),
