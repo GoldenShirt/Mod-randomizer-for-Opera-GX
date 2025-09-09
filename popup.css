@@ -374,7 +374,34 @@ input:checked + .slider:before {
     text-align: center;
     color: #00d4ff;
 }
+/* Disabled state for profile section when randomize-all is on */
+.profile-section.disabled {
+    position: relative;
+    opacity: 0.6;
+}
 
+.profile-section.disabled::after {
+    content: "Randomize all mods is enabled";
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.75);
+    color: #aaa;
+    font-size: 0.85rem;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    pointer-events: auto;
+    border-radius: 8px;
+    z-index: 2;
+    cursor: not-allowed;
+}
+
+.profile-section.disabled select,
+.profile-section.disabled button {
+    pointer-events: none;
+    opacity: 0.5;
+}
 /* ===== Scrollbar ===== */
 ::-webkit-scrollbar {
     width: 8px;

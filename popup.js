@@ -330,7 +330,15 @@ document.addEventListener('DOMContentLoaded', () => {
         if (els.autoModToggle && els.autoModToggle.checked !== randomizeAll) {
             els.autoModToggle.checked = randomizeAll;
         }
-
+        // Update both sections' disabled state
+        const profileSection = document.querySelector('.profile-section');
+        if (randomizeAll) {
+            els.extensionList.parentElement.classList.add("disabled");
+            if (profileSection) profileSection.classList.add("disabled");
+        } else {
+            els.extensionList.parentElement.classList.remove("disabled");
+            if (profileSection) profileSection.classList.remove("disabled");
+        }
         // blacken manual section when randomize-all ON
         if (randomizeAll) {
             els.extensionList.parentElement.classList.add("disabled");
@@ -378,6 +386,11 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         // Render list
+        // In renderExtensionList, before clearing:
+        const oldCheckboxes = els.extensionList.querySelectorAll('input[type="checkbox"]');
+        oldCheckboxes.forEach(cb => {
+            cb.removeEventListener('change', onManualCheckboxChange);
+        });
         els.extensionList.innerHTML = '';
         els.extensionList.classList.toggle('disabled', randomizeAll);
 
@@ -712,8 +725,14 @@ document.addEventListener('DOMContentLoaded', () => {
         await storageSet({ [key]: inputEl.checked });
         console.log(`Toggle changed: ${key} = ${inputEl.checked}`);
 
+        // In the onToggleChange function for autoModIdentificationChecked:
         if (key === 'autoModIdentificationChecked') {
-            // Re-identify mods (in case something changed), then re-render immediately
+            const profileSection = document.querySelector('.profile-section');
+            if (inputEl.checked) {
+                if (profileSection) profileSection.classList.add("disabled");
+            } else {
+                if (profileSection) profileSection.classList.remove("disabled");
+            }
             await sendMsg('identifyModExtensions');
             await renderExtensionList();
         }
