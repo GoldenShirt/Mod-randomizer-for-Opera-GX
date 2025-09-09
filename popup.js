@@ -31,6 +31,33 @@ document.addEventListener('DOMContentLoaded', () => {
         message: document.getElementById('message'),
     };
 
+    // Fixed message areas to keep layout stable: [hr] -> [enabledArea] -> [redirectArea]
+    function ensureMessageAreas() {
+        let hr = document.getElementById('message-hr');
+        if (!hr) {
+            hr = document.createElement('hr');
+            hr.id = 'message-hr';
+            els.randomizeButton.insertAdjacentElement('afterend', hr);
+        }
+        let enabledArea = document.getElementById('enabled-area');
+        if (!enabledArea) {
+            enabledArea = document.createElement('div');
+            enabledArea.id = 'enabled-area';
+            hr.insertAdjacentElement('afterend', enabledArea);
+        }
+        let redirectArea = document.getElementById('redirect-area');
+        if (!redirectArea) {
+            redirectArea = document.createElement('div');
+            redirectArea.id = 'redirect-area';
+            enabledArea.insertAdjacentElement('afterend', redirectArea);
+        }
+        return { hr, enabledArea, redirectArea };
+    }
+
+    // Establish a long‑lived connection so background can know the popup is open (MV3-safe)
+    const popupPort = chrome.runtime.connect({ name: 'popup' });
+
+
     // --- Helpers for chrome APIs ---
     const storageGet = (keys) => new Promise(resolve => chrome.storage.local.get(keys, resolve));
     const storageSet = (obj) => new Promise(resolve => chrome.storage.local.set(obj, resolve));
@@ -304,10 +331,56 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // --- Redirect placeholder & messages ---
+    function removeRedirectMessage() {
+        const { redirectArea } = ensureMessageAreas();
+        // stop any running animation timer
+        const el = redirectArea.querySelector('.redirect-message');
+        if (el?.dataset.intervalId) clearInterval(parseInt(el.dataset.intervalId));
+        redirectArea.innerHTML = '';
+    }
+
+    function showRedirectPlaceholder() {
+        const { redirectArea } = ensureMessageAreas();
+        // clear any previous placeholder
+        removeRedirectMessage();
+
+        const placeholder = document.createElement('p');
+        placeholder.className = 'redirect-message';
+        placeholder.textContent = 'Redirecting to enable checkmarks';
+        let dots = '';
+        const interval = setInterval(() => {
+            dots = dots.length < 3 ? dots + '.' : '';
+            placeholder.textContent = 'Redirecting to enable checkmarks' + dots;
+        }, 300);
+        placeholder.dataset.intervalId = String(interval);
+
+        redirectArea.appendChild(placeholder);
+    }
+
+    function clearEnabledMessage() {
+        const { enabledArea } = ensureMessageAreas();
+        enabledArea.innerHTML = '';
+    }
+
+    function showEnabledMessage(extension) {
+        const { enabledArea } = ensureMessageAreas();
+        // replace content in fixed area; do not touch redirect placeholder
+        enabledArea.innerHTML = '';
+        const d = document.createElement('div');
+        d.id = 'enabledMessage';
+        d.innerHTML = `Enabled Mod: <span class="mod-name">${escapeHtml(extension.name)}</span>`;
+        enabledArea.appendChild(d);
+    }
+
     // --- Randomize action ---
     async function onRandomizeClick() {
         console.log('Randomize clicked');
+        // Clear any previous "Enabled Mod" immediately so it doesn’t linger between runs
+        clearEnabledMessage();
+        // Show (and keep) redirect placeholder until background confirms redirect
         showRedirectPlaceholder();
+
         const r = await sendMsg('randomizeMods');
         if (r?.status === 'success') {
             if (r.enabledExtension) {
@@ -318,52 +391,9 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             console.error('Randomize failed', r);
             showError('Randomize failed: ' + (r?.message || 'unknown'));
+            // remove redirect line if nothing will happen
+            removeRedirectMessage();
         }
-    }
-
-    // --- Redirect placeholder & messages ---
-    function removeRedirectMessage() {
-        document.querySelectorAll('.redirect-message').forEach(el => {
-            if (el.dataset.intervalId) clearInterval(parseInt(el.dataset.intervalId));
-            el.remove();
-        });
-        const hr = document.getElementById('message-hr');
-        const enabled = document.getElementById('enabledMessage');
-        if (hr && !enabled) hr.remove(); // leave hr if enabled message inserted below
-    }
-
-    function showRedirectPlaceholder() {
-        removeRedirectMessage();
-        // Insert a small animated text under message-hr or button
-        const placeholder = document.createElement('p');
-        placeholder.className = 'redirect-message';
-        placeholder.textContent = 'Redirecting to enable checkmarks';
-        let dots = '';
-        const interval = setInterval(() => {
-            dots = dots.length < 3 ? dots + '.' : '';
-            placeholder.textContent = 'Redirecting to enable checkmarks' + dots;
-        }, 300);
-        placeholder.dataset.intervalId = interval;
-        const hr = document.getElementById('message-hr');
-        if (hr) hr.insertAdjacentElement('afterend', placeholder);
-        else els.randomizeButton.insertAdjacentElement('afterend', placeholder);
-    }
-
-    function showEnabledMessage(extension) {
-        removeRedirectMessage();
-        // ensure hr exists
-        let hr = document.getElementById('message-hr');
-        if (!hr) {
-            hr = document.createElement('hr');
-            hr.id = 'message-hr';
-            els.randomizeButton.insertAdjacentElement('afterend', hr);
-        }
-        // remove previous
-        document.getElementById('enabledMessage')?.remove();
-        const d = document.createElement('div');
-        d.id = 'enabledMessage';
-        d.innerHTML = `Enabled Mod: <span class="mod-name">${escapeHtml(extension.name)}</span>`;
-        hr.insertAdjacentElement('afterend', d);
     }
 
     function showError(text) {
@@ -391,6 +421,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const parsed = parseFloat(raw);
             if (isNaN(parsed)) {
                 alert('Invalid time value');
+                return;
+            }
+            // If explicitly set to 0, disable and clear input so placeholder shows
+            if (parsed === 0) {
+                await sendMsg('setRandomizeTime', { time: 0 });
+                els.timeInput.value = '';
+                console.log('Time disabled (0)');
                 return;
             }
             // allow 0.25 only for minutes
@@ -424,7 +461,10 @@ document.addEventListener('DOMContentLoaded', () => {
         // convert stored minutes value to display
         const s = await storageGet('randomizeTime');
         const minutes = s.randomizeTime;
-        if (minutes || minutes === 0) {
+        if (minutes === 0) {
+            // 0 means disabled -> show placeholder
+            els.timeInput.value = '';
+        } else if (minutes) {
             els.timeInput.value = fromMinutesFormat(minutes, newUnit);
         } else {
             els.timeInput.value = '';
@@ -493,6 +533,10 @@ document.addEventListener('DOMContentLoaded', () => {
             showEnabledMessage(msg.enabledExtension);
             refreshCurrentMod();
             console.log('Popup received randomizationCompleted runtime message');
+        } else if (msg?.action === 'redirectingNow') {
+            // Clear redirect message exactly when redirect starts
+            removeRedirectMessage();
+            console.log('Popup received redirectingNow -> removed redirect message');
         }
     });
 
@@ -513,6 +557,11 @@ document.addEventListener('DOMContentLoaded', () => {
     (async function init() {
         // Prevent default submit behavior
         document.getElementById('modForm')?.addEventListener('submit', e => e.preventDefault());
+
+        // Stabilize areas on open; do not show any messages yet
+        ensureMessageAreas();
+        clearEnabledMessage();
+        removeRedirectMessage();
 
         // Ask background we opened (it may identify mods)
         await sendMsg('popupOpened');
@@ -536,7 +585,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const unit = s.timeUnit || 'minutes';
         els.timeUnit.value = unit;
         els.timeUnit.dataset.previousUnit = unit;
-        els.timeInput.value = (s.randomizeTime || s.randomizeTime === 0) ? fromMinutesFormat(s.randomizeTime, unit) : '';
+        els.timeInput.value = (s.randomizeTime === 0)
+            ? ''
+            : ((s.randomizeTime || s.randomizeTime === 0) ? fromMinutesFormat(s.randomizeTime, unit) : '');
 
         await loadAndRenderProfiles();
         await renderExtensionList();

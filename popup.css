@@ -285,9 +285,10 @@ input:checked + .slider:before {
     top: -0.9em;          /* extend up to cover legend area */
     bottom: 0;
     background: rgba(0, 0, 0, 0.75);
-    pointer-events: none;
+    pointer-events: auto; /* block clicks/scroll */
     border-radius: 8px;
     z-index: 2;
+    cursor: not-allowed;  /* visual cue */
 }
 
 
@@ -302,11 +303,12 @@ input:checked + .slider:before {
     justify-content: center;
     align-items: center;
     text-align: center;
-    pointer-events: none;
+    pointer-events: auto; /* block hover/focus on inputs beneath */
     border-radius: 8px;
     padding: 1rem;
     box-sizing: border-box;
     z-index: 3;
+    cursor: not-allowed;  /* visual cue */
 }
 
 

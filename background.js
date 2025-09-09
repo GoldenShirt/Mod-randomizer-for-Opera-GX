@@ -12,11 +12,21 @@ const MIN_COOLDOWN_MS = 5000;
 let redirectTimeout = null;
 let randomizationInProgress = false;
 
+// Define storage helper object (promise wrappers for chrome.storage.local)
 const storage = {
   get(keys) { return new Promise(resolve => chrome.storage.local.get(keys, resolve)); },
   set(obj)  { return new Promise(resolve => chrome.storage.local.set(obj, resolve)); },
-  remove(k)  { return new Promise(resolve => chrome.storage.local.remove(k, resolve)); }
+  remove(k) { return new Promise(resolve => chrome.storage.local.remove(k, resolve)); }
 };
+
+// Track live popup connections (MV3-safe)
+const popupPorts = new Set();
+chrome.runtime.onConnect.addListener((port) => {
+  if (port.name === 'popup') {
+    popupPorts.add(port);
+    port.onDisconnect.addListener(() => popupPorts.delete(port));
+  }
+});
 
 const management = {
   getAll() { return new Promise(resolve => chrome.management.getAll(resolve)); },
@@ -25,9 +35,8 @@ const management = {
 
 // ---------- Utilities ----------
 function isPopupOpen() {
-  // Returns true if any extension view of type 'popup' exists
-  const views = chrome.extension.getViews({ type: 'popup' });
-  return Array.isArray(views) && views.length > 0;
+  // MV3 service workers: detect popup via live Port connections
+  return popupPorts.size > 0;
 }
 
 function nowMs() { return Date.now(); }
@@ -199,6 +208,8 @@ async function executeRandomization(source = 'unknown', redirectDelayMs = 3000) 
     if (isPopupOpen()) {
       try {
         chrome.runtime.sendMessage({ action: 'randomizationCompleted', enabledExtension: result });
+        // We delivered it live; prevent showing it again on next popup open
+        await storage.set({ pendingRandomization: null });
         console.log('Sent runtime message to popup: randomizationCompleted');
       } catch (e) {
         // Non-fatal; leave pendingRandomization for popup to read
