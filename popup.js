@@ -340,7 +340,15 @@ document.addEventListener('DOMContentLoaded', () => {
         redirectArea.innerHTML = '';
     }
 
-    function showRedirectPlaceholder() {
+    async function showRedirectPlaceholder() {
+        // Respect the "Open mods tab" toggle; if it's off, do not show the redirect message
+        const st = await storageGet('toggleOpenModsTabChecked');
+        const openModsEnabled = !!st.toggleOpenModsTabChecked;
+        if (!openModsEnabled) {
+            removeRedirectMessage();
+            return;
+        }
+
         const { redirectArea } = ensureMessageAreas();
         // clear any previous placeholder
         removeRedirectMessage();

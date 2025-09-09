@@ -95,6 +95,7 @@ legend {
 .auto-section {
     padding: 0.6rem;
     font-size: 1rem;
+    margin-bottom: 3px;
 }
 
 .switch-label {
@@ -240,8 +241,9 @@ input:checked + .slider:before {
 }
 
 #extensionList {
-    max-height: 200px;
-    overflow-y: auto;
+    /* Let the popup handle scrolling to avoid nested scrollbars */
+    max-height: none;
+    overflow: visible;
     list-style: none;
     margin: 0;
     padding: 0;
@@ -300,18 +302,16 @@ input:checked + .slider:before {
     color: #aaa;
     font-size: 0.9rem;
     display: flex;
-    justify-content: center;
-    align-items: center;
+    justify-content: center;   /* center horizontally */
+    align-items: flex-start;    /* stick to the top so it's visible immediately */
     text-align: center;
     pointer-events: auto; /* block hover/focus on inputs beneath */
     border-radius: 8px;
-    padding: 1rem;
+    padding: 1rem 1rem 1rem; /* top padding to avoid hugging the edge */
     box-sizing: border-box;
     z-index: 3;
     cursor: not-allowed;  /* visual cue */
 }
-
-
 /* Legend on top, no background */
 .manual-section legend {
     position: relative;
