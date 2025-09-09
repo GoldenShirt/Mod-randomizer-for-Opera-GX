@@ -8,6 +8,10 @@
 const MAX_LAST_RANDOMIZATION_AGE = 24 * 60 * 60 * 1000;
 const MIN_RANDOMIZE_MINUTES = 0.25; // 15s for testing
 const MIN_COOLDOWN_MS = 5000;
+// Throttle/Coalesce identify calls to avoid duplicate logs
+const IDENTIFY_THROTTLE_MS = 1500;
+let identifyInFlight = null;
+let lastIdentifyAt = 0;
 
 let redirectTimeout = null;
 let randomizationInProgress = false;
@@ -15,18 +19,12 @@ let randomizationInProgress = false;
 // Define storage helper object (promise wrappers for chrome.storage.local)
 const storage = {
   get(keys) { return new Promise(resolve => chrome.storage.local.get(keys, resolve)); },
-  set(obj)  { return new Promise(resolve => chrome.storage.local.set(obj, resolve)); },
+  set(obj)  { return new Promise(resolve => chrome.storage.local.set(obj, resolve)); }, // IMPORTANT: pass resolve
   remove(k) { return new Promise(resolve => chrome.storage.local.remove(k, resolve)); }
 };
 
-// Track live popup connections (MV3-safe)
-const popupPorts = new Set();
-chrome.runtime.onConnect.addListener((port) => {
-  if (port.name === 'popup') {
-    popupPorts.add(port);
-    port.onDisconnect.addListener(() => popupPorts.delete(port));
-  }
-});
+// Remove MV3 popup port tracking: we now just attempt sendMessage and treat failures as "not open"
+// (previous popupPorts/onConnect logic removed)
 
 const management = {
   getAll() { return new Promise(resolve => chrome.management.getAll(resolve)); },
@@ -34,10 +32,7 @@ const management = {
 };
 
 // ---------- Utilities ----------
-function isPopupOpen() {
-  // MV3 service workers: detect popup via live Port connections
-  return popupPorts.size > 0;
-}
+// Removed isPopupOpen(): no longer needed
 
 function nowMs() { return Date.now(); }
 
@@ -48,20 +43,36 @@ async function logToggle(key, value) {
 
 // ---------- Identification ----------
 async function identifyModExtensions() {
-  try {
-    const all = await management.getAll();
-    const detectedIds = all
-      .filter(e => e.updateUrl === 'https://api.gx.me/store/mods/update')
-      .map(e => ({ id: e.id, name: e.name }));
+  // If a previous identify is in progress, reuse it to avoid duplicate work/logs
+  if (identifyInFlight) return identifyInFlight;
 
-    // store detected list (ids + names) for popup rendering and for new/add logic
-    await storage.set({ detectedModList: detectedIds });
-    console.log('identifyModExtensions -> detected', detectedIds.length, 'mods');
-    return detectedIds;
-  } catch (err) {
-    console.error('identifyModExtensions error', err);
-    return [];
+  const now = Date.now();
+  // If called again very soon after the last full identify, serve from storage without re-logging
+  if (now - lastIdentifyAt < IDENTIFY_THROTTLE_MS) {
+    const cached = await storage.get('detectedModList');
+    return cached.detectedModList || [];
   }
+
+  identifyInFlight = (async () => {
+    try {
+      const all = await management.getAll();
+      const detectedIds = all
+        .filter(e => e.updateUrl === 'https://api.gx.me/store/mods/update')
+        .map(e => ({ id: e.id, name: e.name }));
+
+      await storage.set({ detectedModList: detectedIds });
+      lastIdentifyAt = Date.now();
+      console.log('identifyModExtensions -> detected', detectedIds.length, 'mods');
+      return detectedIds;
+    } catch (err) {
+      console.error('identifyModExtensions error', err);
+      return [];
+    } finally {
+      identifyInFlight = null;
+    }
+  })();
+
+  return identifyInFlight;
 }
 
 // ---------- Profiles & Mod storage ----------
@@ -83,41 +94,59 @@ async function ensureDefaults() {
   }
 }
 
-// Add detected mods to active profile (if auto-identify enabled) or ensure they appear in UI (but unchecked)
-async function addDetectedModsToActiveProfile(autoIdentify) {
-  const [detectedWrapper, profilesWrapper] = await Promise.all([
+// Add only newly detected mods to all profiles when randomize-all is OFF.
+// Maintain a persistent set of knownDetectedIds so previously unchecked mods stay unchecked.
+async function addDetectedModsToAllProfiles(autoIdentify /* randomizeAllMods */) {
+  const [detectedWrapper, profilesWrapper, knownWrapper] = await Promise.all([
     storage.get('detectedModList'),
-    storage.get(['profiles', 'activeProfile'])
+    storage.get(['profiles', 'activeProfile']),
+    storage.get('knownDetectedIds')
   ]);
-  const detected = detectedWrapper.detectedModList || [];
+
+  const detectedList = detectedWrapper.detectedModList || [];
+  const detectedIds = detectedList.map(m => m.id);
   const profiles = profilesWrapper.profiles || {};
-  const active = profilesWrapper.activeProfile || 'Default';
 
-  if (!profiles[active]) profiles[active] = [];
+  // Ensure there is at least a Default profile
+  if (!Object.keys(profiles).length) profiles['Default'] = [];
 
-  // Build a set of existing ids in the profile
-  const profileSet = new Set(profiles[active]);
+  // Build set of previously known ids (persisted)
+  const knownDetectedIds = Array.isArray(knownWrapper.knownDetectedIds) ? new Set(knownWrapper.knownDetectedIds) : new Set();
 
-  // Add new detected mods to profile if autoIdentify === true
-  let added = false;
-  for (const m of detected) {
-    if (!profileSet.has(m.id)) {
-      if (autoIdentify) {
-        profiles[active].push(m.id);
-        added = true;
-        console.log(`identify: added detected mod ${m.name} (${m.id}) to profile '${active}'`);
-      } else {
-        // if not auto, keep them out of the profile but ensure UI can show them from detectedModList
-        // we don't change the profile in this case
+  // Compute only genuinely new ids (newly installed mods since last time)
+  const newIds = detectedIds.filter(id => !knownDetectedIds.has(id));
+
+  let mutated = false;
+
+  // Only mutate profiles when randomize-all is OFF, and only by adding newIds
+  if (!autoIdentify && newIds.length) {
+    for (const profileName of Object.keys(profiles)) {
+      const set = new Set(profiles[profileName] || []);
+      let addedCount = 0;
+      for (const id of newIds) {
+        if (!set.has(id)) {
+          profiles[profileName].push(id); // add new mod ON for all profiles
+          addedCount++;
+        }
+      }
+      if (addedCount > 0) {
+        console.log(`identify: added ${addedCount} new mod(s) to profile '${profileName}'`);
+        mutated = true;
       }
     }
   }
-  if (added) {
-    await storage.set({ profiles });
-  }
-  return { detected, profiles, active };
-}
 
+  // Update knownDetectedIds to include all currently detected ids (union)
+  const updatedKnown = Array.from(new Set([...knownDetectedIds, ...detectedIds]));
+  // Persist storage updates atomically
+  if (mutated) {
+    await storage.set({ profiles, knownDetectedIds: updatedKnown });
+  } else {
+    await storage.set({ knownDetectedIds: updatedKnown });
+  }
+
+  return { detected: detectedList, profiles };
+}
 // ---------- Randomization ----------
 async function handleModEnableWorkflow(modIdsForRandomization) {
   // modIdsForRandomization: array of extension IDs to use for randomization
@@ -130,7 +159,7 @@ async function handleModEnableWorkflow(modIdsForRandomization) {
   const s = await storage.get('lastEnabledModId');
   const lastEnabled = s.lastEnabledModId;
 
-  // Get current extensions from management to see which are disabled and available
+  // Get current extensions from management to see which are part of the set
   const all = await management.getAll();
   const mods = all.filter(e => modIdsForRandomization.includes(e.id));
 
@@ -139,14 +168,15 @@ async function handleModEnableWorkflow(modIdsForRandomization) {
     return null;
   }
 
-  // disable any that are currently enabled (to get to a known state)
+  // Disable any that are currently enabled (normalize state)
   await Promise.all(mods.filter(m => m.enabled).map(m => management.setEnabled(m.id, false)));
 
-  // Candidates are disabled mods not equal to lastEnabled (if available)
-  let candidates = mods.filter(m => !m.enabled && m.id !== lastEnabled);
+  // IMPORTANT: Don't rely on stale m.enabled flags after disabling.
+  // Select a candidate solely by excluding the lastEnabled id to avoid repeats.
+  // If this leaves no candidates (e.g., only one mod that equals lastEnabled), skip enabling to honor "no repeat".
+  const candidates = mods.filter(m => m.id !== lastEnabled);
   if (candidates.length === 0) {
-    // If nothing excluding lastEnabled, skip (preserve previous logic)
-    console.log('No disabled candidates excluding last enabled; skipping selection to avoid toggling previous.');
+    console.log('No candidates available that differ from last enabled; skipping to avoid repeat.');
     return null;
   }
 
@@ -184,13 +214,25 @@ async function executeRandomization(source = 'unknown', redirectDelayMs = 3000) 
       await storage.set({ lastRandomizationTime: now });
     }
 
-    // read active profile and profiles
-    const { profiles = {}, activeProfile = 'Default', toggleOpenModsTabChecked = true } =
-      await storage.get(['profiles', 'activeProfile', 'toggleOpenModsTabChecked']);
+    // read active profile and profiles + randomize-all flag and detected list
+    const {
+      profiles = {},
+      activeProfile = 'Default',
+      toggleOpenModsTabChecked = true,
+      autoModIdentificationChecked = false
+    } = await storage.get(['profiles', 'activeProfile', 'toggleOpenModsTabChecked', 'autoModIdentificationChecked']);
+    const { detectedModList = [] } = await storage.get('detectedModList');
 
-    const activeList = profiles[activeProfile] || [];
+    // Determine which list to use:
+    // - randomize-all ON -> use all detected mods
+    // - randomize-all OFF -> use the saved checks of the active profile
+    const useAll = !!autoModIdentificationChecked;
+    const activeList = useAll
+      ? detectedModList.map(m => m.id)
+      : (profiles[activeProfile] || []);
+
     if (!activeList.length) {
-      console.log('executeRandomization -> active profile has no mods to randomize');
+      console.log('executeRandomization -> no mods to randomize (list is empty)');
       if (source !== 'manual') randomizationInProgress = false;
       return null;
     }
@@ -204,19 +246,15 @@ async function executeRandomization(source = 'unknown', redirectDelayMs = 3000) 
       console.log('Stored pendingRandomization for popup consumption:', pending);
     }
 
-    // If popup open, send runtime message (safe)
-    if (isPopupOpen()) {
-      try {
-        chrome.runtime.sendMessage({ action: 'randomizationCompleted', enabledExtension: result });
-        // We delivered it live; prevent showing it again on next popup open
-        await storage.set({ pendingRandomization: null });
-        console.log('Sent runtime message to popup: randomizationCompleted');
-      } catch (e) {
-        // Non-fatal; leave pendingRandomization for popup to read
-        console.warn('runtime.sendMessage to popup failed (ignored)', e && e.message);
-      }
-    } else {
-      console.log('Popup not open — skip runtime message, popup will read pendingRandomization on open');
+    // Always attempt to notify popup; treat failures as "popup not open"
+    try {
+      chrome.runtime.sendMessage({ action: 'randomizationCompleted', enabledExtension: result });
+      // We delivered it live; prevent showing it again on next popup open
+      await storage.set({ pendingRandomization: null });
+      console.log('Sent runtime message to popup: randomizationCompleted');
+    } catch (e) {
+      // Non-fatal; leave pendingRandomization for popup to read
+      console.debug('runtime.sendMessage (randomizationCompleted) likely no listener; will rely on pending.', e && e.message);
     }
 
     // If open mods tab is enabled, schedule redirect after redirectDelayMs
@@ -271,16 +309,15 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   (async () => {
     try {
       switch (message.action) {
-        case 'identifyModExtensions':
-          {
-            const detected = await identifyModExtensions();
-            // After detection, possibly add to profile if autoIdentify on
-            const s = await storage.get('autoModIdentificationChecked');
-            await addDetectedModsToActiveProfile(!!s.autoModIdentificationChecked);
-            sendResponse({ status: 'success', detectedModList: detected });
-            console.log('Message: identifyModExtensions -> responded');
-          }
+        case 'identifyModExtensions': {
+          const detected = await identifyModExtensions();
+          const s = await storage.get('autoModIdentificationChecked');
+          // Only add genuinely new mods when randomize-all is OFF
+          await addDetectedModsToAllProfiles(!!s.autoModIdentificationChecked);
+          sendResponse({ status: 'success', detectedModList: detected });
+          console.log('Message: identifyModExtensions -> responded');
           break;
+        }
 
         case 'getExtensions': {
           // Return only detected mods (so popup shows only mods), plus profiles + activeProfile
@@ -315,24 +352,19 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         }
 
         case 'popupOpened': {
-          // When popup opens, ensure identification if autoIdentify enabled and return pendingRandomization if any
           const { autoModIdentificationChecked } = await storage.get('autoModIdentificationChecked');
-          if (autoModIdentificationChecked) {
-            await identifyModExtensions();
-            await addDetectedModsToActiveProfile(true);
-            console.log('popupOpened -> auto-identify performed');
-          }
+          await identifyModExtensions();
+          await addDetectedModsToAllProfiles(!!autoModIdentificationChecked);
+          console.log('popupOpened -> identification done (profiles updated only for newly detected mods and only if randomize-all OFF)');
           // Give popup any pendingRandomization and then clear it (popup will display)
           const { pendingRandomization } = await storage.get('pendingRandomization');
           if (pendingRandomization) {
-            // Only send via runtime if popup open (it is) — but still return in response too
+            // Try to send; if popup isn't actively listening, storage fallback remains.
             try {
-              if (isPopupOpen()) {
-                chrome.runtime.sendMessage({ action: 'randomizationCompleted', enabledExtension: pendingRandomization.enabledExtension });
-                console.log('popupOpened -> sent runtime randomizationCompleted to popup');
-              }
+              chrome.runtime.sendMessage({ action: 'randomizationCompleted', enabledExtension: pendingRandomization.enabledExtension });
+              console.log('popupOpened -> sent runtime randomizationCompleted to popup');
             } catch (e) {
-              console.warn('popupOpened: runtime.sendMessage failed', e && e.message);
+              console.debug('popupOpened: runtime.sendMessage likely no listener; popup will read from storage.', e && e.message);
             }
             // Optionally keep or clear pending event; we'll clear so it doesn't show again
             await storage.remove('pendingRandomization');
@@ -367,13 +399,23 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
         case 'createProfile': {
           const { profileName } = message;
+          const name = (profileName || '').trim();
           const { profiles = {} } = await storage.get('profiles');
-          if (profiles[profileName]) {
+          if (!name) {
+            sendResponse({ status: 'error', message: 'Profile name cannot be empty' });
+            break;
+          }
+          const nameLc = name.toLowerCase();
+          if (Object.keys(profiles).some(k => k.toLowerCase() === nameLc)) {
             sendResponse({ status: 'error', message: 'Profile already exists' });
           } else {
-            profiles[profileName] = [];
+            // Initialize the new profile with ALL detected mods checked
+            const { detectedModList = [] } = await storage.get('detectedModList');
+            const allIds = Array.isArray(detectedModList) ? detectedModList.map(m => m.id) : [];
+            profiles[name] = allIds;
+
             await storage.set({ profiles });
-            console.log('Created profile', profileName);
+            console.log('Created profile with all mods checked:', name, 'count=', allIds.length);
             sendResponse({ status: 'success' });
           }
           break;
@@ -381,18 +423,31 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
         case 'deleteProfile': {
           const { profileName } = message;
-          const data = await storage.get(['profiles', 'activeProfile']);
+          const data = await storage.get(['profiles', 'activeProfile', 'detectedModList']);
           const profiles = data.profiles || {};
           let active = data.activeProfile || 'Default';
+
           if (!profiles[profileName]) {
             sendResponse({ status: 'error', message: 'Profile not found' });
             break;
           }
+
           delete profiles[profileName];
-          // pick a new active if needed
-          const remaining = Object.keys(profiles);
-          if (!remaining.length) profiles['Default'] = [];
+
+          // Determine remaining profiles
+          let remaining = Object.keys(profiles);
+
+          // If none remain, recreate Default with ALL detected mods checked
+          if (!remaining.length) {
+            const detected = Array.isArray(data.detectedModList) ? data.detectedModList : [];
+            profiles['Default'] = detected.map(m => m.id);
+            remaining = ['Default'];
+            console.log('Recreated Default profile with all detected mods after deletion');
+          }
+
+          // Pick a new active if needed
           if (active === profileName) active = remaining[0] || 'Default';
+
           await storage.set({ profiles, activeProfile: active });
           console.log('Deleted profile', profileName, 'new active', active);
           sendResponse({ status: 'success', activeProfile: active });
@@ -401,33 +456,44 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
         case 'renameProfile': {
           const { oldName, newName } = message;
+          const oldN = (oldName || '').trim();
+          const newN = (newName || '').trim();
           const { profiles = {}, activeProfile = 'Default' } = await storage.get(['profiles', 'activeProfile']);
-          if (!profiles[oldName]) {
+          if (!profiles[oldN]) {
             sendResponse({ status: 'error', message: 'Old profile not found' });
             break;
           }
-          if (profiles[newName]) {
+          if (!newN) {
+            sendResponse({ status: 'error', message: 'New profile name cannot be empty' });
+            break;
+          }
+          const oldLc = oldN.toLowerCase();
+          const newLc = newN.toLowerCase();
+          // If the new name is different (beyond casing) and collides with another profile (case-insensitive), reject
+          if (newLc !== oldLc && Object.keys(profiles).some(k => k.toLowerCase() === newLc)) {
             sendResponse({ status: 'error', message: 'New profile name already exists' });
             break;
           }
-          profiles[newName] = profiles[oldName];
-          delete profiles[oldName];
-          const newActive = (activeProfile === oldName) ? newName : activeProfile;
+          // Perform rename (allow case-only change as well)
+          profiles[newN] = profiles[oldN];
+          delete profiles[oldN];
+          const newActive = (activeProfile === oldN) ? newN : activeProfile;
           await storage.set({ profiles, activeProfile: newActive });
-          console.log(`Renamed profile ${oldName} -> ${newName}`);
+          console.log(`Renamed profile ${oldN} -> ${newN}`);
           sendResponse({ status: 'success', activeProfile: newActive });
           break;
         }
 
         case 'setActiveProfile': {
           const { profileName } = message;
+          const name = (profileName || '').trim();
           const { profiles = {} } = await storage.get('profiles');
-          if (!profiles[profileName]) {
+          if (!profiles[name]) {
             sendResponse({ status: 'error', message: 'Profile not found' });
             break;
           }
-          await storage.set({ activeProfile: profileName });
-          console.log('Active profile set to', profileName);
+          await storage.set({ activeProfile: name });
+          console.log('Active profile set to', name);
           sendResponse({ status: 'success' });
           break;
         }
@@ -454,10 +520,14 @@ chrome.alarms.onAlarm.addListener(async alarm => {
 
 // startup & install
 chrome.runtime.onStartup.addListener(async () => {
-  const s = await storage.get(['toggleRandomizeOnStartupChecked']);
+  const s = await storage.get(['toggleRandomizeOnStartupChecked', 'autoModIdentificationChecked']);
+  if (s.autoModIdentificationChecked === undefined) {
+    await storage.set({ autoModIdentificationChecked: true });
+    console.log('Startup: randomize-all missing; set to ON by default');
+  }
   if (s.toggleRandomizeOnStartupChecked) {
     console.log('onStartup -> toggleRandomizeOnStartupChecked true; scheduling startup randomize');
-    setTimeout(() => executeRandomization('startup', 5000), 1000); // small wait for startup
+    setTimeout(() => executeRandomization('startup', 5000), 1000);
   }
 });
 
@@ -466,19 +536,24 @@ chrome.runtime.onInstalled.addListener(async details => {
     // Initialize sensible defaults
     await storage.set({
       toggleRandomizeOnStartupChecked: false,
-      autoModIdentificationChecked: true,
+      autoModIdentificationChecked: true, // randomize-all: ON by default
       toggleOpenModsTabChecked: true,
       toggleRandomizeOnSetTimeChecked: false,
       randomizeTime: 0,
       currentMod: 'None'
     });
-    console.log('Installed: default settings saved');
+    console.log('Installed: default settings saved (randomize-all ON)');
     await identifyModExtensions();
     await ensureDefaults();
   } else if (details.reason === 'update') {
     console.log('Extension updated');
+    // Migration: if key is missing, default to true (randomize-all ON)
     const s = await storage.get('autoModIdentificationChecked');
-    if (s.autoModIdentificationChecked) await identifyModExtensions();
+    if (s.autoModIdentificationChecked === undefined) {
+      await storage.set({ autoModIdentificationChecked: true });
+      console.log('Migration: set randomize-all ON (autoModIdentificationChecked=true)');
+    }
+    await identifyModExtensions();
     await ensureDefaults();
   }
 });

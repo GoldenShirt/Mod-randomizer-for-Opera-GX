@@ -23,7 +23,7 @@ h2 {
 #current-mod {
     text-align: center;
     font-size: 1.1rem;
-    margin: 0.25rem 0 1rem 0;
+    margin: 0.25rem 0 0.25rem 0;
     color: #ff4081;
 }
 
@@ -304,7 +304,7 @@ input:checked + .slider:before {
 
 /* Message layer above blackout */
 .manual-section.disabled::after {
-    content: "Shuffle all mods is enabled";
+    content: "Randomize all mods is enabled";
     position: absolute;
     inset: 0;
     color: #aaa;

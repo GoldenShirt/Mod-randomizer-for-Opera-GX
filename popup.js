@@ -14,11 +14,12 @@ document.addEventListener('DOMContentLoaded', () => {
         newProfileBtn: document.getElementById('newProfileBtn'),
         deleteProfileBtn: document.getElementById('deleteProfileBtn'),
 
-        autoModToggle: document.getElementById('shuffleAllMods'),
+        autoModToggle: document.getElementById('randomizeAllMods'),
         openModsToggle: document.getElementById('toggleOpenModsTab'),
         startupToggle: document.getElementById('toggleRandomizeOnStartup'),
         setTimeToggle: document.getElementById('toggleRandomizeOnSetTime'),
 
+        // Wire time controls correctly
         timeInput: document.getElementById('timeInput'),
         timeUnit: document.getElementById('timeUnitSelect'),
 
@@ -30,6 +31,12 @@ document.addEventListener('DOMContentLoaded', () => {
         currentMod: document.getElementById('current-mod'),
         message: document.getElementById('message'),
     };
+
+    // Track which profile the UI is currently rendering/working with to avoid saving to a wrong profile on quick switches
+    let currentProfile = null;
+    let renderLock = false; // prevents mid-save re-renders that can drop fast clicks
+    let manualSaveDebounce = null; // single debouncer reused across renders
+    let pendingSaveProfile = null; // profile name for which the debounced save will run
 
     // Keep the existing hr below the Randomize button untouched.
     // Create messages right after that hr, and a temporary hr between messages and the manual section.
@@ -169,9 +176,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- UI updates: profiles ---
     async function loadAndRenderProfiles() {
-        const resp = await sendMsg('getExtensions');
-        const profiles = resp?.profiles || (await storageGet('profiles')).profiles || { Default: [] };
-        const activeProfile = resp?.activeProfile || (await storageGet('activeProfile')).activeProfile || Object.keys(profiles)[0] || 'Default';
+        // Avoid extra background round-trip; only profiles/activeProfile are needed here
+        const s = await storageGet(['profiles', 'activeProfile']);
+        const profiles = s?.profiles || { Default: [] };
+        const activeProfile = s?.activeProfile || Object.keys(profiles)[0] || 'Default';
+
+        // Keep a stable notion of the current profile in the popup:
+        // - if currentProfile is unset or missing -> set to activeProfile
+        // - otherwise preserve currentProfile (so we don't stomp it during background-triggered refreshes)
+        if (!currentProfile || profiles[currentProfile] === undefined) {
+            currentProfile = activeProfile;
+        }
 
         // populate select
         els.profileSelect.innerHTML = '';
@@ -179,21 +194,31 @@ document.addEventListener('DOMContentLoaded', () => {
             const opt = document.createElement('option');
             opt.value = name;
             opt.textContent = name;
-            if (name === activeProfile) opt.selected = true;
+            if (name === currentProfile) opt.selected = true;
             els.profileSelect.appendChild(opt);
         }
+
+        // Ensure the select reflects the currentProfile explicitly
+        els.profileSelect.value = currentProfile;
 
         // Make sure profilesOrder exists and includes these profiles
         await ensureProfilesOrder(profiles);
 
         // Wire rename by double-click on select
-        // (limit: double-click anywhere on select triggers rename of currently selected profile)
-        // remove previous dblclick listener if any: can't remove anonymous - ensure we add only once by flag
         if (!els.profileSelect._hasDbl) {
             els.profileSelect.addEventListener('dblclick', async () => {
                 const oldName = els.profileSelect.value;
-                const newName = prompt('Rename profile', oldName);
+                const newNameRaw = prompt('Rename profile', oldName);
+                const newName = (newNameRaw || '').trim();
                 if (!newName || newName === oldName) return;
+
+                // Prevent accidental duplicates (case-insensitive) on the client side
+                const names = Object.keys(profiles);
+                if (names.some(n => n.toLowerCase() === newName.toLowerCase() && n !== oldName)) {
+                    alert('A profile with this name already exists.');
+                    return;
+                }
+
                 const res = await sendMsg('renameProfile', { oldName, newName });
                 if (res && res.status === 'success') {
                     // If we store profilesOrder locally, rename that too
@@ -206,7 +231,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                     console.log(`Renamed profile ${oldName} -> ${newName}`);
                     await loadAndRenderProfiles();
-                    // set active profile in background was done by renameProfile handler
                 } else {
                     alert(res && res.message ? res.message : 'Rename failed');
                 }
@@ -217,25 +241,55 @@ document.addEventListener('DOMContentLoaded', () => {
 
     els.profileSelect.addEventListener('change', async (e) => {
         const profileName = e.target.value;
+        if (renderLock) return; // avoid switching while a save is in-flight
+
+        // Cancel any pending save tied to previous profile view to avoid cross-profile writes
+        if (manualSaveDebounce) {
+            clearTimeout(manualSaveDebounce);
+            manualSaveDebounce = null;
+        }
+        pendingSaveProfile = null;
+
+        currentProfile = profileName; // keep popup-local state in sync
         await sendMsg('setActiveProfile', { profileName });
         console.log('Profile switched to', profileName);
         await renderExtensionList();
     });
 
     els.newProfileBtn.addEventListener('click', async () => {
-        const name = prompt('New profile name:');
+        const nameRaw = prompt('New profile name:');
+        const name = (nameRaw || '').trim();
         if (!name) return;
+
+        // Pre-check duplicates (case-insensitive) to provide faster feedback
+        const resp = await sendMsg('getExtensions');
+        const profiles = resp?.profiles || {};
+        if (Object.keys(profiles).some(n => n.toLowerCase() === name.toLowerCase())) {
+            alert('A profile with this name already exists.');
+            return;
+        }
+
+        // First ask background to create the profile
         const r = await sendMsg('createProfile', { profileName: name });
         if (r && r.status === 'success') {
-            // ensure profilesOrder entry
-            const st = await storageGet('profilesOrder');
-            const po = st.profilesOrder || {};
-            if (!po[name]) { po[name] = []; await storageSet({ profilesOrder: po }); }
-            console.log('Created profile', name);
-            await loadAndRenderProfiles();
-            // make it active
+            // Immediately make it active to avoid rendering the old profile in between
             await sendMsg('setActiveProfile', { profileName: name });
+            currentProfile = name;
+
+            // Update the select right away so the UI matches the state
+            // (loadAndRenderProfiles will repopulate it, but we set it now to avoid flicker)
+            if (els.profileSelect.querySelector(`option[value="${name}"]`) == null) {
+                const opt = document.createElement('option');
+                opt.value = name;
+                opt.textContent = name;
+                els.profileSelect.appendChild(opt);
+            }
+            els.profileSelect.value = name;
+
+            // Refresh profiles and render the list for the new profile
+            await loadAndRenderProfiles();
             await renderExtensionList();
+            console.log('Created + switched to profile', name);
         } else {
             alert(r && r.message ? r.message : 'Failed to create profile');
         }
@@ -261,21 +315,42 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Extension / manual list rendering ---
     // We render items in the order defined in profilesOrder[active], then any enabled-but-not-in-order, then detected extras.
     async function renderExtensionList() {
+        if (renderLock) return;
+
         // fetch everything
         const resp = await sendMsg('getExtensions');
+
+        // Default randomize-all to ON when key is missing
         const settings = await storageGet('autoModIdentificationChecked');
-        const autoModIdentificationChecked = settings.autoModIdentificationChecked;
-        if (autoModIdentificationChecked) {
-            els.extensionList.parentElement.classList.add("disabled"); // fieldset.manual-section
+        const randomizeAll = settings.autoModIdentificationChecked === undefined
+            ? true
+            : !!settings.autoModIdentificationChecked;
+
+        // Sync toggle UI if needed
+        if (els.autoModToggle && els.autoModToggle.checked !== randomizeAll) {
+            els.autoModToggle.checked = randomizeAll;
+        }
+
+        // blacken manual section when randomize-all ON
+        if (randomizeAll) {
+            els.extensionList.parentElement.classList.add("disabled");
         } else {
             els.extensionList.parentElement.classList.remove("disabled");
         }
-        // background may return different shapes; handle both
+
         const detected = resp?.detectedModList
             || (resp?.extensions ? resp.extensions.filter(e => e.updateUrl === 'https://api.gx.me/store/mods/update').map(e => ({ id: e.id, name: e.name })) : []);
         const profiles = resp?.profiles || (await storageGet('profiles')).profiles || { Default: [] };
-        const active = resp?.activeProfile || (await storageGet('activeProfile')).activeProfile || Object.keys(profiles)[0] || 'Default';
-        const autoIdentify = resp?.autoModIdentificationChecked;
+
+        // Choose profile for non-randomize mode (preserve currentProfile if valid)
+        const active = (currentProfile && profiles[currentProfile] !== undefined)
+            ? currentProfile
+            : (resp?.activeProfile || (await storageGet('activeProfile')).activeProfile || Object.keys(profiles)[0] || 'Default');
+
+        // Remember which profile this list belongs to (used only when randomize-all is OFF and by the debounced saver)
+        els.extensionList.dataset.profile = active;
+
+        // When randomize-all is OFF, show the saved state; when ON, we will force-check visually
         const profileList = Array.isArray(profiles[active]) ? profiles[active] : [];
 
         const detectedMap = new Map((detected || []).map(d => [d.id, d.name]));
@@ -288,57 +363,68 @@ document.addEventListener('DOMContentLoaded', () => {
             await storageSet({ profilesOrder });
         }
 
-        // Build display order (preserve order array)
-        const order = profilesOrder[active].slice(); // copy
+        // Build display order
+        const order = profilesOrder[active].slice();
         const seen = new Set(order);
-        // ensure enabled (profileList) items are present in order (without changing order of existing items)
         for (const id of profileList) if (!seen.has(id)) { order.push(id); seen.add(id); }
-        // add detected mods not seen
         for (const d of detected) if (!seen.has(d.id)) { order.push(d.id); seen.add(d.id); }
 
-        // Render list (but do not remove items from order on uncheck)
+        // Render list
         els.extensionList.innerHTML = '';
-        els.extensionList.classList.toggle('disabled', !!autoIdentify);
+        els.extensionList.classList.toggle('disabled', randomizeAll);
 
         for (const id of order) {
             const name = detectedMap.get(id) || 'Unknown Mod (not detected)';
             const li = document.createElement('li');
             li.dataset.extid = id;
 
-            // label
             const label = document.createElement('span');
             label.textContent = name;
             label.title = name;
             label.style.flex = '1';
 
-            // checkbox
             const cb = document.createElement('input');
             cb.type = 'checkbox';
             cb.dataset.extid = id;
-            cb.checked = profileList.includes(id); // true if currently enabled in profile (saved)
-            cb.disabled = !!autoIdentify;
-            cb.addEventListener('change', onManualCheckboxChange);
+
+            if (randomizeAll) {
+                // Show all as checked visually, but do not save any changes while in this mode
+                cb.checked = true;
+                cb.disabled = true;
+            } else {
+                // Reflect real saved state from the current profile
+                cb.checked = profileList.includes(id);
+                cb.disabled = false;
+                cb.addEventListener('change', onManualCheckboxChange);
+            }
 
             li.appendChild(cb);
             li.appendChild(label);
             els.extensionList.appendChild(li);
         }
 
-        console.log('Rendered manual list for profile', active, 'entries', order.length);
+        console.log(`Rendered manual list for profile ${active} entries ${order.length} (detected=${detected.length}, randomizeAll=${randomizeAll})`);
     }
 
     // When a checkbox changes: save checked ids to active profile but KEEP order in profilesOrder (don't remove unchecked)
-    let manualSaveDebounce = null;
+    // use the existing manualSaveDebounce declared earlier
     async function onManualCheckboxChange() {
+        // Optimistically prevent re-renders for a short time so fast clicks are not lost
+        renderLock = true;
+
         // debounce quick toggles
         if (manualSaveDebounce) clearTimeout(manualSaveDebounce);
+
+        // Capture the profile this list is for at the moment of the change
+        pendingSaveProfile = els.extensionList.dataset.profile || currentProfile || 'Default';
+
         manualSaveDebounce = setTimeout(async () => {
             const checkedIds = Array.from(els.extensionList.querySelectorAll('input[type="checkbox"]'))
                 .filter(cb => cb.checked)
                 .map(cb => cb.dataset.extid);
 
-            const resp = await sendMsg('getExtensions');
-            const active = resp?.activeProfile || (await storageGet('activeProfile')).activeProfile || 'Default';
+            // Save strictly to the profile that this list was rendered for
+            const active = pendingSaveProfile || 'Default';
 
             // Update profilesOrder to include any newly checked ids if missing (append at end), but DO NOT remove unchecked ids.
             const st = await storageGet('profilesOrder');
@@ -354,10 +440,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.log('Updated profilesOrder after manual save');
             }
 
-            // Save the currently checked ids as the profile's enabled list (background will store to profiles[active])
+            // Save the currently checked ids as the profile's enabled list
             const saveRes = await sendMsg('saveModExtensionIds', { modExtensionIds: checkedIds, profileName: active });
             console.log(`Saved ${checkedIds.length} mods to profile "${active}"`, saveRes);
-        }, 250);
+
+            pendingSaveProfile = null;
+
+            // Release the render lock shortly after save to keep UI responsive on bursts
+            setTimeout(() => { renderLock = false; }, 100);
+        }, 120);
     }
 
     // --- Search filter ---
@@ -487,35 +578,63 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Time input handling ---
     let timeDebounce = null;
-    async function onTimeInputChange() {
+    let lastSubmittedMinutes = null; // prevent duplicate sends of the same effective value
+
+    async function onTimeInputChange(evt) {
         if (timeDebounce) clearTimeout(timeDebounce);
+        const inputEl = evt?.target || els.timeInput;
+        const unitEl = els.timeUnit;
+        // If inputs are missing, do nothing safely
+        if (!inputEl || !unitEl) return;
+
+        // Quick diagnostic so you see a log immediately when typing/changing
+        console.log('Time input changed:', inputEl.value, 'unit=', unitEl.value);
+
         timeDebounce = setTimeout(async () => {
-            const raw = els.timeInput.value;
-            const unit = els.timeUnit.value;
+            const raw = inputEl.value;
+            const unit = unitEl.value;
+
+            // Helper to skip duplicates and send
+            const maybeSend = async (minutesToSet) => {
+                if (lastSubmittedMinutes === minutesToSet) {
+                    console.log('Time unchanged; ignoring duplicate set:', minutesToSet, 'minutes');
+                    return;
+                }
+                lastSubmittedMinutes = minutesToSet;
+                await sendMsg('setRandomizeTime', { time: minutesToSet });
+                if (minutesToSet === 0) {
+                    console.log('Time disabled (0 or empty)');
+                } else {
+                    console.log('Time set ->', minutesToSet, 'minutes');
+                }
+            };
+
             if (!raw && raw !== '0') {
                 // treat empty as disabled
-                await sendMsg('setRandomizeTime', { time: 0 });
-                console.log('Time disabled (empty)');
+                await maybeSend(0);
                 return;
             }
+
             const parsed = parseFloat(raw);
             if (isNaN(parsed)) {
                 alert('Invalid time value');
                 return;
             }
+
             // If explicitly set to 0, disable and clear input so placeholder shows
             if (parsed === 0) {
-                await sendMsg('setRandomizeTime', { time: 0 });
+                await maybeSend(0);
                 els.timeInput.value = '';
-                console.log('Time disabled (0)');
                 return;
             }
+
             // allow 0.25 only for minutes
             if (unit === 'minutes' && parsed === 0.25) {
-                await sendMsg('setRandomizeTime', { time: 0.25 });
+                await maybeSend(0.25);
                 console.log('Time set -> 0.25 minutes (test)');
                 return;
             }
+
             // validation
             if (unit === 'minutes' && parsed < 1) {
                 alert('Randomize time must be at least 1 minute (or 0.25 for testing) or 0 to disable.');
@@ -525,22 +644,29 @@ document.addEventListener('DOMContentLoaded', () => {
                 alert(`Randomize time must be at least 1 ${unit} or 0 to disable.`);
                 return;
             }
+
             const minutes = toMinutes(parsed, unit);
             if (isNaN(minutes)) return;
-            await sendMsg('setRandomizeTime', { time: minutes });
-            console.log('Time set ->', minutes, 'minutes (from', parsed, unit, ')');
+
+            await maybeSend(minutes);
         }, 400);
     }
 
-    async function onTimeUnitChange() {
-        const oldUnit = els.timeUnit.dataset.previousUnit || 'minutes';
-        const newUnit = els.timeUnit.value;
-        els.timeUnit.dataset.previousUnit = newUnit;
+    async function onTimeUnitChange(evt) {
+        const unitEl = evt?.target || els.timeUnit;
+        if (!unitEl) return;
+
+        console.log('Time unit change fired:', unitEl.value);
+
+        const oldUnit = unitEl.dataset.previousUnit || 'minutes';
+        const newUnit = unitEl.value;
+        unitEl.dataset.previousUnit = newUnit;
         await storageSet({ timeUnit: newUnit });
 
         // convert stored minutes value to display
         const s = await storageGet('randomizeTime');
         const minutes = s.randomizeTime;
+        if (!els.timeInput) return;
         if (minutes === 0) {
             // 0 means disabled -> show placeholder
             els.timeInput.value = '';
@@ -579,20 +705,15 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log(`Toggle changed: ${key} = ${inputEl.checked}`);
 
         if (key === 'autoModIdentificationChecked') {
-            if (inputEl.checked) {
-                // ask background to identify and then re-render
-                await sendMsg('identifyModExtensions');
-                console.log('Requested identifyModExtensions due to toggle on');
-            }
-            // always re-render list (to enable/disable checkboxes + overlay)
+            // Re-identify mods (in case something changed), then re-render immediately
+            await sendMsg('identifyModExtensions');
             await renderExtensionList();
         }
         if (key === 'toggleRandomizeOnSetTimeChecked') {
             await sendMsg('toggleRandomizeOnSetTimeChecked', { value: inputEl.checked });
-            console.log('Requested toggleRandomizeOnSetTimeChecked', inputEl.checked);
+            // Removed extra "Requested toggleRandomizeOnSetTimeChecked" log to avoid duplicate log lines
         }
     }
-
     // --- Event wiring ---
     els.searchBar.addEventListener('input', onSearchInput);
 
@@ -603,9 +724,15 @@ document.addEventListener('DOMContentLoaded', () => {
     els.startupToggle.addEventListener('change', () => onToggleChange('toggleRandomizeOnStartupChecked', els.startupToggle));
     els.setTimeToggle.addEventListener('change', () => onToggleChange('toggleRandomizeOnSetTimeChecked', els.setTimeToggle));
 
-    els.timeInput.addEventListener('input', onTimeInputChange);
-    els.timeInput.addEventListener('change', onTimeInputChange);
-    els.timeUnit.addEventListener('change', onTimeUnitChange);
+    // Guard these in case the inputs are not present in this build/variant
+    if (els.timeInput) {
+        // Only listen to 'input' to avoid duplicate sends from 'change'
+        els.timeInput.addEventListener('input', onTimeInputChange);
+        // Removed: els.timeInput.addEventListener('change', onTimeInputChange);
+    }
+    if (els.timeUnit) {
+        els.timeUnit.addEventListener('change', onTimeUnitChange);
+    }
 
     // Listen for background runtime notifications while popup is open
     chrome.runtime.onMessage.addListener((msg) => {
@@ -624,13 +751,20 @@ document.addEventListener('DOMContentLoaded', () => {
     chrome.storage.onChanged.addListener((changes, area) => {
         if (area !== 'local') return;
         if (changes.currentMod) refreshCurrentMod();
-        if (changes.detectedModList || changes.profiles || changes.profilesOrder || changes.autoModIdentificationChecked) {
-            // re-render everything
-            (async() => {
+
+        // If profile names or activeProfile changed, rebuild the select; otherwise avoid stomping currentProfile
+        const shouldReloadProfiles =
+            (changes.profiles && typeof changes.profiles.newValue === 'object' && typeof changes.profiles.oldValue === 'object' &&
+             Object.keys(changes.profiles.newValue || {}).join('|') !== Object.keys(changes.profiles.oldValue || {}).join('|'))
+            || !!changes.activeProfile;
+
+        (async () => {
+            if (shouldReloadProfiles) {
                 await loadAndRenderProfiles();
-                await renderExtensionList();
-            })();
-        }
+            }
+            // Always re-render the list to pick up state changes, preserving currentProfile
+            await renderExtensionList();
+        })();
     });
 
     // --- Initialization on popup open ---
@@ -643,7 +777,17 @@ document.addEventListener('DOMContentLoaded', () => {
         clearEnabledMessage();
         removeRedirectMessage();
 
-        // Ask background we opened (it may identify mods)
+        // Ensure randomize-all defaults to ON on first run
+        const sInitial = await storageGet('autoModIdentificationChecked');
+        if (sInitial.autoModIdentificationChecked === undefined) {
+            await storageSet({ autoModIdentificationChecked: true });
+            if (els.autoModToggle) els.autoModToggle.checked = true;
+        }
+
+        // Remove double identification: rely on popupOpened to do it once
+        // await sendMsg('identifyModExtensions');
+
+        // Continue normal popup open flow (this performs identification once)
         await sendMsg('popupOpened');
 
         // load toggles & time unit & time value
@@ -657,17 +801,24 @@ document.addEventListener('DOMContentLoaded', () => {
             'currentMod'
         ]);
 
-        els.autoModToggle.checked = !!s.autoModIdentificationChecked;
+        // Default randomize-all to true if missing
+        const randomizeAll = s.autoModIdentificationChecked === undefined ? true : !!s.autoModIdentificationChecked;
+
+        if (els.autoModToggle) els.autoModToggle.checked = randomizeAll;
         els.openModsToggle.checked = s.toggleOpenModsTabChecked === undefined ? true : !!s.toggleOpenModsTabChecked;
         els.startupToggle.checked = !!s.toggleRandomizeOnStartupChecked;
         els.setTimeToggle.checked = !!s.toggleRandomizeOnSetTimeChecked;
 
         const unit = s.timeUnit || 'minutes';
-        els.timeUnit.value = unit;
-        els.timeUnit.dataset.previousUnit = unit;
-        els.timeInput.value = (s.randomizeTime === 0)
-            ? ''
-            : ((s.randomizeTime || s.randomizeTime === 0) ? fromMinutesFormat(s.randomizeTime, unit) : '');
+        if (els.timeUnit) {
+            els.timeUnit.value = unit;
+            els.timeUnit.dataset.previousUnit = unit;
+        }
+        if (els.timeInput) {
+            els.timeInput.value = (s.randomizeTime === 0)
+                ? ''
+                : ((s.randomizeTime || s.randomizeTime === 0) ? fromMinutesFormat(s.randomizeTime, unit) : '');
+        }
 
         await loadAndRenderProfiles();
         await renderExtensionList();
