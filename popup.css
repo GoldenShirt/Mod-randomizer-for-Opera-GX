@@ -105,6 +105,12 @@ legend {
     margin-bottom: 0.6rem;
 }
 
+/* Vertically match the switch height for the label text */
+.switch-label > span {
+    display: inline-block;
+    line-height: 22px; /* match switch height */
+}
+
 .switch-label:hover {
     color: #00d4ff;
 }
@@ -113,8 +119,9 @@ legend {
 .switch {
     position: relative;
     display: inline-block;
-    width: 44px;
+    width: 47px;              /* reduced to ~2/3 of 56px */
     height: 22px;
+    transform: translateY(2px); /* keep alignment with text */
 }
 
 .switch input {
@@ -146,11 +153,12 @@ input:checked + .slider {
 }
 
 input:checked + .slider:before {
-    transform: translateX(22px);
+    transform: translateX(25px); /* 37 - 18 - 4 = 15px */
 }
 
 .switch:hover .slider {
     box-shadow: 0 0 6px #00d4ff;
+    cursor: pointer;
 }
 
 /* Time input */
