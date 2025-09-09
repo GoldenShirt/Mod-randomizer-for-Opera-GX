@@ -8,273 +8,249 @@
 const MAX_LAST_RANDOMIZATION_AGE = 24 * 60 * 60 * 1000;
 const MIN_RANDOMIZE_MINUTES = 0.25; // 15s for testing
 const MIN_COOLDOWN_MS = 5000;
-// Throttle/Coalesce identify calls to avoid duplicate logs
 const IDENTIFY_THROTTLE_MS = 1500;
+
 let identifyInFlight = null;
 let lastIdentifyAt = 0;
 
 let redirectTimeout = null;
 let randomizationInProgress = false;
 
-// Define storage helper object (promise wrappers for chrome.storage.local)
-const storage = {
-  get(keys) { return new Promise(resolve => chrome.storage.local.get(keys, resolve)); },
-  set(obj)  { return new Promise(resolve => chrome.storage.local.set(obj, resolve)); }, // IMPORTANT: pass resolve
-  remove(k) { return new Promise(resolve => chrome.storage.local.remove(k, resolve)); }
-};
+// Track popup connection
+let popupPort = null;
 
-// Remove MV3 popup port tracking: we now just attempt sendMessage and treat failures as "not open"
-// (previous popupPorts/onConnect logic removed)
+// ---------- Storage helper ----------
+const storage = {
+    get(keys) { return new Promise(resolve => chrome.storage.local.get(keys, resolve)); },
+    set(obj)  { return new Promise(resolve => chrome.storage.local.set(obj, resolve)); },
+    remove(k) { return new Promise(resolve => chrome.storage.local.remove(k, resolve)); }
+};
 
 const management = {
-  getAll() { return new Promise(resolve => chrome.management.getAll(resolve)); },
-  setEnabled(id, enabled) { return new Promise(resolve => chrome.management.setEnabled(id, enabled, () => resolve())); }
+    getAll() { return new Promise(resolve => chrome.management.getAll(resolve)); },
+    setEnabled(id, enabled) { return new Promise(resolve => chrome.management.setEnabled(id, enabled, () => resolve())); }
 };
-
-// ---------- Utilities ----------
-// Removed isPopupOpen(): no longer needed
 
 function nowMs() { return Date.now(); }
 
-async function logToggle(key, value) {
-  console.log(`Toggle saved: ${key} = ${value}`);
-  await storage.set({ [key]: value });
+// ---------- Port-based delivery ----------
+async function tryDeliverToPopup(message) {
+    if (popupPort) {
+        try {
+            popupPort.postMessage(message);
+            console.log('Delivered to popup via port:', message.action);
+            return true;
+        } catch (e) {
+            console.warn('Port delivery failed, clearing popupPort', e);
+            popupPort = null;
+        }
+    }
+    return new Promise(resolve => {
+        chrome.runtime.sendMessage(message, (res) => {
+            if (chrome.runtime.lastError) {
+                console.debug('runtime.sendMessage fallback failed', chrome.runtime.lastError.message);
+                resolve(false);
+            } else {
+                console.log('runtime.sendMessage fallback returned, may not be consumed');
+                resolve(true);
+            }
+        });
+    });
 }
+
+chrome.runtime.onConnect.addListener((port) => {
+    if (port && port.name === 'popup') {
+        popupPort = port;
+        console.log('Background: popup connected via port');
+
+        port.onMessage.addListener(async (msg) => {
+            if (!msg || !msg.action) return;
+
+            if (msg.action === 'popupReady') {
+                const { pendingRandomization } = await storage.get('pendingRandomization');
+                if (pendingRandomization && pendingRandomization.enabledExtension) {
+                    popupPort.postMessage({
+                        action: 'randomizationCompleted',
+                        enabledExtension: pendingRandomization.enabledExtension,
+                        pendingId: pendingRandomization.timestamp
+                    });
+                    console.log('Sent pendingRandomization via port to popup');
+                }
+            } else if (msg.action === 'randomizationAck') {
+                await storage.remove('pendingRandomization');
+                console.log('Cleared pendingRandomization after ACK');
+            }
+        });
+
+        port.onDisconnect.addListener(() => {
+            console.log('Popup port disconnected');
+            popupPort = null;
+        });
+    }
+});
 
 // ---------- Identification ----------
 async function identifyModExtensions() {
-  // If a previous identify is in progress, reuse it to avoid duplicate work/logs
-  if (identifyInFlight) return identifyInFlight;
-
-  const now = Date.now();
-  // If called again very soon after the last full identify, serve from storage without re-logging
-  if (now - lastIdentifyAt < IDENTIFY_THROTTLE_MS) {
-    const cached = await storage.get('detectedModList');
-    return cached.detectedModList || [];
-  }
-
-  identifyInFlight = (async () => {
-    try {
-      const all = await management.getAll();
-      const detectedIds = all
-        .filter(e => e.updateUrl === 'https://api.gx.me/store/mods/update')
-        .map(e => ({ id: e.id, name: e.name }));
-
-      await storage.set({ detectedModList: detectedIds });
-      lastIdentifyAt = Date.now();
-      console.log('identifyModExtensions -> detected', detectedIds.length, 'mods');
-      return detectedIds;
-    } catch (err) {
-      console.error('identifyModExtensions error', err);
-      return [];
-    } finally {
-      identifyInFlight = null;
+    if (identifyInFlight) return identifyInFlight;
+    const now = Date.now();
+    if (now - lastIdentifyAt < IDENTIFY_THROTTLE_MS) {
+        const cached = await storage.get('detectedModList');
+        return cached.detectedModList || [];
     }
-  })();
-
-  return identifyInFlight;
+    identifyInFlight = (async () => {
+        try {
+            const all = await management.getAll();
+            const detectedIds = all
+                .filter(e => e.updateUrl === 'https://api.gx.me/store/mods/update')
+                .map(e => ({ id: e.id, name: e.name }));
+            await storage.set({ detectedModList: detectedIds });
+            lastIdentifyAt = Date.now();
+            console.log('identifyModExtensions -> detected', detectedIds.length, 'mods');
+            return detectedIds;
+        } catch (err) {
+            console.error('identifyModExtensions error', err);
+            return [];
+        } finally {
+            identifyInFlight = null;
+        }
+    })();
+    return identifyInFlight;
 }
 
-// ---------- Profiles & Mod storage ----------
-// Storage layout minimal keys used here:
-// profiles: { [profileName]: [ids...] }
-// activeProfile: string
-// detectedModList: [{id,name}, ...]
-// pendingRandomization: { enabledExtension, timestamp }   // last randomize not yet consumed by popup
-
+// ---------- Profiles ----------
 async function ensureDefaults() {
-  const s = await storage.get(['profiles', 'activeProfile']);
-  if (!s.profiles) {
-    // initialize a default profile that preserves previous single-list behavior if present
-    const prev = await storage.get('modExtensionIds');
-    const defaultList = Array.isArray(prev.modExtensionIds) ? prev.modExtensionIds : [];
-    const profiles = { Default: defaultList };
-    await storage.set({ profiles, activeProfile: 'Default' });
-    console.log('Initialized default profiles');
-  }
+    const s = await storage.get(['profiles', 'activeProfile']);
+    if (!s.profiles) {
+        const prev = await storage.get('modExtensionIds');
+        const defaultList = Array.isArray(prev.modExtensionIds) ? prev.modExtensionIds : [];
+        const profiles = { Default: defaultList };
+        await storage.set({ profiles, activeProfile: 'Default' });
+        console.log('Initialized default profiles');
+    }
 }
+
 
 // Add only newly detected mods to all profiles when randomize-all is OFF.
 // Maintain a persistent set of knownDetectedIds so previously unchecked mods stay unchecked.
 async function addDetectedModsToAllProfiles(autoIdentify /* randomizeAllMods */) {
-  const [detectedWrapper, profilesWrapper, knownWrapper] = await Promise.all([
-    storage.get('detectedModList'),
-    storage.get(['profiles', 'activeProfile']),
-    storage.get('knownDetectedIds')
-  ]);
+    const [detectedWrapper, profilesWrapper, knownWrapper] = await Promise.all([
+        storage.get('detectedModList'),
+        storage.get(['profiles', 'activeProfile']),
+        storage.get('knownDetectedIds')
+    ]);
 
-  const detectedList = detectedWrapper.detectedModList || [];
-  const detectedIds = detectedList.map(m => m.id);
-  const profiles = profilesWrapper.profiles || {};
+    const detectedList = detectedWrapper.detectedModList || [];
+    const detectedIds = detectedList.map(m => m.id);
+    const profiles = profilesWrapper.profiles || {};
 
-  // Ensure there is at least a Default profile
-  if (!Object.keys(profiles).length) profiles['Default'] = [];
+    // Ensure there is at least a Default profile
+    if (!Object.keys(profiles).length) profiles['Default'] = [];
 
-  // Build set of previously known ids (persisted)
-  const knownDetectedIds = Array.isArray(knownWrapper.knownDetectedIds) ? new Set(knownWrapper.knownDetectedIds) : new Set();
+    // Build set of previously known ids (persisted)
+    const knownDetectedIds = Array.isArray(knownWrapper.knownDetectedIds) ? new Set(knownWrapper.knownDetectedIds) : new Set();
 
-  // Compute only genuinely new ids (newly installed mods since last time)
-  const newIds = detectedIds.filter(id => !knownDetectedIds.has(id));
+    // Compute only genuinely new ids (newly installed mods since last time)
+    const newIds = detectedIds.filter(id => !knownDetectedIds.has(id));
 
-  let mutated = false;
+    let mutated = false;
 
-  // Only mutate profiles when randomize-all is OFF, and only by adding newIds
-  if (!autoIdentify && newIds.length) {
-    for (const profileName of Object.keys(profiles)) {
-      const set = new Set(profiles[profileName] || []);
-      let addedCount = 0;
-      for (const id of newIds) {
-        if (!set.has(id)) {
-          profiles[profileName].push(id); // add new mod ON for all profiles
-          addedCount++;
+    // Only mutate profiles when randomize-all is OFF, and only by adding newIds
+    if (!autoIdentify && newIds.length) {
+        for (const profileName of Object.keys(profiles)) {
+            const set = new Set(profiles[profileName] || []);
+            let addedCount = 0;
+            for (const id of newIds) {
+                if (!set.has(id)) {
+                    profiles[profileName].push(id); // add new mod ON for all profiles
+                    addedCount++;
+                }
+            }
+            if (addedCount > 0) {
+                console.log(`identify: added ${addedCount} new mod(s) to profile '${profileName}'`);
+                mutated = true;
+            }
         }
-      }
-      if (addedCount > 0) {
-        console.log(`identify: added ${addedCount} new mod(s) to profile '${profileName}'`);
-        mutated = true;
-      }
     }
-  }
 
-  // Update knownDetectedIds to include all currently detected ids (union)
-  const updatedKnown = Array.from(new Set([...knownDetectedIds, ...detectedIds]));
-  // Persist storage updates atomically
-  if (mutated) {
-    await storage.set({ profiles, knownDetectedIds: updatedKnown });
-  } else {
-    await storage.set({ knownDetectedIds: updatedKnown });
-  }
+    // Update knownDetectedIds to include all currently detected ids (union)
+    const updatedKnown = Array.from(new Set([...knownDetectedIds, ...detectedIds]));
+    // Persist storage updates atomically
+    if (mutated) {
+        await storage.set({ profiles, knownDetectedIds: updatedKnown });
+    } else {
+        await storage.set({ knownDetectedIds: updatedKnown });
+    }
 
-  return { detected: detectedList, profiles };
+    return { detected: detectedList, profiles };
 }
 // ---------- Randomization ----------
 async function handleModEnableWorkflow(modIdsForRandomization) {
-  // modIdsForRandomization: array of extension IDs to use for randomization
-  if (!modIdsForRandomization || modIdsForRandomization.length === 0) {
-    console.log('No mods in active profile to randomize.');
-    return null;
-  }
-
-  // Get last enabled mod to avoid immediate repeat
-  const s = await storage.get('lastEnabledModId');
-  const lastEnabled = s.lastEnabledModId;
-
-  // Get current extensions from management to see which are part of the set
-  const all = await management.getAll();
-  const mods = all.filter(e => modIdsForRandomization.includes(e.id));
-
-  if (!mods.length) {
-    console.log('handleModEnableWorkflow -> no matching installed mod extensions.');
-    return null;
-  }
-
-  // Disable any that are currently enabled (normalize state)
-  await Promise.all(mods.filter(m => m.enabled).map(m => management.setEnabled(m.id, false)));
-
-  // IMPORTANT: Don't rely on stale m.enabled flags after disabling.
-  // Select a candidate solely by excluding the lastEnabled id to avoid repeats.
-  // If this leaves no candidates (e.g., only one mod that equals lastEnabled), skip enabling to honor "no repeat".
-  const candidates = mods.filter(m => m.id !== lastEnabled);
-  if (candidates.length === 0) {
-    console.log('No candidates available that differ from last enabled; skipping to avoid repeat.');
-    return null;
-  }
-
-  const selected = candidates[Math.floor(Math.random() * candidates.length)];
-  await management.setEnabled(selected.id, true);
-  await storage.set({ lastEnabledModId: selected.id, currentMod: selected.name });
-
-  console.log(`Randomize -> enabled ${selected.name} (${selected.id})`);
-  return { id: selected.id, name: selected.name };
+    if (!modIdsForRandomization || modIdsForRandomization.length === 0) {
+        console.log('No mods in active profile to randomize.');
+        return null;
+    }
+    const s = await storage.get('lastEnabledModId');
+    const lastEnabled = s.lastEnabledModId;
+    const all = await management.getAll();
+    const mods = all.filter(e => modIdsForRandomization.includes(e.id));
+    if (!mods.length) return null;
+    await Promise.all(mods.filter(m => m.enabled).map(m => management.setEnabled(m.id, false)));
+    const candidates = mods.filter(m => m.id !== lastEnabled);
+    if (!candidates.length) return null;
+    const selected = candidates[Math.floor(Math.random() * candidates.length)];
+    await management.setEnabled(selected.id, true);
+    await storage.set({ lastEnabledModId: selected.id, currentMod: selected.name });
+    console.log(`Randomize -> enabled ${selected.name}`);
+    return { id: selected.id, name: selected.name };
 }
 
 async function executeRandomization(source = 'unknown', redirectDelayMs = 3000) {
-  // source: 'manual' | 'startup' | 'alarm' etc
-  try {
-    if (randomizationInProgress && source !== 'manual') {
-      console.log(`Skipping ${source} randomization — already in progress`);
-      return null;
-    }
-
-    const now = nowMs();
-    const s = await storage.get('lastRandomizationTime');
-    let lastRandomizationTime = s.lastRandomizationTime;
-    // clean old marker
-    if (lastRandomizationTime && (now - lastRandomizationTime) > MAX_LAST_RANDOMIZATION_AGE) {
-      await storage.remove('lastRandomizationTime');
-      lastRandomizationTime = null;
-    }
-    if (source !== 'manual' && lastRandomizationTime && (now - lastRandomizationTime) < MIN_COOLDOWN_MS) {
-      console.log(`Skipping ${source} randomization — cooldown`);
-      return null;
-    }
-
-    if (source !== 'manual') {
-      randomizationInProgress = true;
-      await storage.set({ lastRandomizationTime: now });
-    }
-
-    // read active profile and profiles + randomize-all flag and detected list
-    const {
-      profiles = {},
-      activeProfile = 'Default',
-      toggleOpenModsTabChecked = true,
-      autoModIdentificationChecked = false
-    } = await storage.get(['profiles', 'activeProfile', 'toggleOpenModsTabChecked', 'autoModIdentificationChecked']);
-    const { detectedModList = [] } = await storage.get('detectedModList');
-
-    // Determine which list to use:
-    // - randomize-all ON -> use all detected mods
-    // - randomize-all OFF -> use the saved checks of the active profile
-    const useAll = !!autoModIdentificationChecked;
-    const activeList = useAll
-      ? detectedModList.map(m => m.id)
-      : (profiles[activeProfile] || []);
-
-    if (!activeList.length) {
-      console.log('executeRandomization -> no mods to randomize (list is empty)');
-      if (source !== 'manual') randomizationInProgress = false;
-      return null;
-    }
-
-    const result = await handleModEnableWorkflow(activeList);
-
-    // store pending randomization so popup can pick it up when opened even if it wasn't open now
-    if (result) {
-      const pending = { enabledExtension: result, timestamp: nowMs() };
-      await storage.set({ pendingRandomization: pending });
-      console.log('Stored pendingRandomization for popup consumption:', pending);
-    }
-
-    // Always attempt to notify popup; treat failures as "popup not open"
     try {
-      chrome.runtime.sendMessage({ action: 'randomizationCompleted', enabledExtension: result });
-      // We delivered it live; prevent showing it again on next popup open
-      await storage.set({ pendingRandomization: null });
-      console.log('Sent runtime message to popup: randomizationCompleted');
-    } catch (e) {
-      // Non-fatal; leave pendingRandomization for popup to read
-      console.debug('runtime.sendMessage (randomizationCompleted) likely no listener; will rely on pending.', e && e.message);
+        if (randomizationInProgress && source !== 'manual') return null;
+        const now = nowMs();
+        const s = await storage.get('lastRandomizationTime');
+        let lastRandomizationTime = s.lastRandomizationTime;
+        if (lastRandomizationTime && (now - lastRandomizationTime) > MAX_LAST_RANDOMIZATION_AGE) {
+            await storage.remove('lastRandomizationTime');
+            lastRandomizationTime = null;
+        }
+        if (source !== 'manual' && lastRandomizationTime && (now - lastRandomizationTime) < MIN_COOLDOWN_MS) {
+            console.log('Skipping randomization — cooldown');
+            return null;
+        }
+        if (source !== 'manual') {
+            randomizationInProgress = true;
+            await storage.set({ lastRandomizationTime: now });
+        }
+        const { profiles = {}, activeProfile = 'Default', toggleOpenModsTabChecked = true, autoModIdentificationChecked = false } =
+            await storage.get(['profiles', 'activeProfile', 'toggleOpenModsTabChecked', 'autoModIdentificationChecked']);
+        const { detectedModList = [] } = await storage.get('detectedModList');
+        const useAll = !!autoModIdentificationChecked;
+        const activeList = useAll ? detectedModList.map(m => m.id) : (profiles[activeProfile] || []);
+        if (!activeList.length) return null;
+        const result = await handleModEnableWorkflow(activeList);
+        if (result) {
+            const pending = { enabledExtension: result, timestamp: nowMs() };
+            await storage.set({ pendingRandomization: pending });
+            tryDeliverToPopup({ action: 'randomizationCompleted', enabledExtension: result, pendingId: pending.timestamp });
+        }
+        if (result && toggleOpenModsTabChecked) {
+            if (redirectTimeout) clearTimeout(redirectTimeout);
+            redirectTimeout = setTimeout(async () => {
+                await tryDeliverToPopup({ action: 'redirectingNow' });
+                chrome.tabs.create({ url: 'opera://mods/manage' }, () => { redirectTimeout = null; });
+            }, redirectDelayMs);
+        }
+        if (source !== 'manual') randomizationInProgress = false;
+        return result;
+    } catch (err) {
+        console.error('executeRandomization error', err);
+        if (source !== 'manual') randomizationInProgress = false;
+        return null;
     }
-
-    // If open mods tab is enabled, schedule redirect after redirectDelayMs
-    if (result && toggleOpenModsTabChecked) {
-      if (redirectTimeout) clearTimeout(redirectTimeout);
-      redirectTimeout = setTimeout(() => {
-        chrome.tabs.create({ url: 'opera://mods/manage' }, () => { redirectTimeout = null; });
-        console.log('Redirected to opera://mods/manage');
-      }, redirectDelayMs);
-      console.log(`Scheduled redirect to mods/manage in ${redirectDelayMs}ms`);
-    }
-
-    if (source !== 'manual') randomizationInProgress = false;
-    return result;
-  } catch (err) {
-    console.error('executeRandomization error', err);
-    if (source !== 'manual') randomizationInProgress = false;
-    return null;
-  }
 }
+
+
 
 // ---------- Alarms & Scheduling ----------
 async function setRandomizeTime(minutes) {

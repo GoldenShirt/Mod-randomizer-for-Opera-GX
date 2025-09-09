@@ -8,29 +8,41 @@
 // - Logs actions to console for debugging
 
 document.addEventListener('DOMContentLoaded', () => {
-    // --- Elements (must match popup.html) ---
     const els = {
         profileSelect: document.getElementById('profileSelect'),
         newProfileBtn: document.getElementById('newProfileBtn'),
         deleteProfileBtn: document.getElementById('deleteProfileBtn'),
-
         autoModToggle: document.getElementById('randomizeAllMods'),
         openModsToggle: document.getElementById('toggleOpenModsTab'),
         startupToggle: document.getElementById('toggleRandomizeOnStartup'),
         setTimeToggle: document.getElementById('toggleRandomizeOnSetTime'),
-
-        // Wire time controls correctly
         timeInput: document.getElementById('timeInput'),
         timeUnit: document.getElementById('timeUnitSelect'),
-
         randomizeButton: document.getElementById('randomizeButton'),
-
         extensionList: document.getElementById('extensionList'),
         searchBar: document.getElementById('searchBar'),
-
         currentMod: document.getElementById('current-mod'),
         message: document.getElementById('message'),
     };
+
+    // --- Port connection for robust messaging ---
+    const port = chrome.runtime.connect({ name: 'popup' });
+    port.onMessage.addListener((msg) => {
+        if (!msg || !msg.action) return;
+        if (msg.action === 'randomizationCompleted' && msg.enabledExtension) {
+            showEnabledMessage(msg.enabledExtension);
+            refreshCurrentMod();
+            console.log('Popup received randomizationCompleted via port');
+            try { port.postMessage({ action: 'randomizationAck', pendingId: msg.pendingId }); }
+            catch (e) { chrome.runtime.sendMessage({ action: 'randomizationAck', pendingId: msg.pendingId }); }
+        } else if (msg.action === 'redirectingNow') {
+            removeRedirectMessage();
+            console.log('Popup received redirectingNow via port');
+        }
+    });
+    port.postMessage({ action: 'popupReady' });
+
+
 
     // Track which profile the UI is currently rendering/working with to avoid saving to a wrong profile on quick switches
     let currentProfile = null;
