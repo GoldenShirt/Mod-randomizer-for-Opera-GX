@@ -311,6 +311,7 @@ input:checked + .slider:before {
     box-sizing: border-box;
     z-index: 3;
     cursor: not-allowed;  /* visual cue */
+    margin-top: 15px;
 }
 /* Legend on top, no background */
 .manual-section legend {
@@ -348,7 +349,10 @@ input:checked + .slider:before {
 #extensionList input[type="checkbox"]:hover {
     transform: scale(1.1);
 }
-
+#message-hr{
+    margin-top: 4px;
+    margin-bottom: 4px;
+}
 /* ===== Messages ===== */
 #enabledMessage {
     font-size: 1rem;

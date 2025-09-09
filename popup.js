@@ -31,31 +31,69 @@ document.addEventListener('DOMContentLoaded', () => {
         message: document.getElementById('message'),
     };
 
-    // Fixed message areas to keep layout stable: [hr] -> [enabledArea] -> [redirectArea]
+    // Keep the existing hr below the Randomize button untouched.
+    // Create messages right after that hr, and a temporary hr between messages and the manual section.
+    // Structure:
+    //   [Randomize Button]
+    //   [permanent hr (#message-hr)]
+    //   [enabledArea]
+    //   [redirectArea]
+    //   [temporary hr (#message-temp-hr)]
+    //   [Manual section...]
     function ensureMessageAreas() {
-        let hr = document.getElementById('message-hr');
-        if (!hr) {
-            hr = document.createElement('hr');
-            hr.id = 'message-hr';
-            els.randomizeButton.insertAdjacentElement('afterend', hr);
+        // Permanent separator that already exists in HTML
+        let permanentHr = document.getElementById('message-hr');
+        if (!permanentHr) {
+            permanentHr = document.createElement('hr');
+            permanentHr.id = 'message-hr';
+            els.randomizeButton.insertAdjacentElement('afterend', permanentHr);
         }
+
+        // Ensure enabledArea immediately after the permanent hr
         let enabledArea = document.getElementById('enabled-area');
         if (!enabledArea) {
             enabledArea = document.createElement('div');
             enabledArea.id = 'enabled-area';
-            hr.insertAdjacentElement('afterend', enabledArea);
+            permanentHr.insertAdjacentElement('afterend', enabledArea);
+        } else {
+            // Make sure it's placed right after the permanent hr
+            if (permanentHr.nextElementSibling !== enabledArea) {
+                permanentHr.insertAdjacentElement('afterend', enabledArea);
+            }
         }
+
+        // Ensure redirectArea right after enabledArea
         let redirectArea = document.getElementById('redirect-area');
         if (!redirectArea) {
             redirectArea = document.createElement('div');
             redirectArea.id = 'redirect-area';
             enabledArea.insertAdjacentElement('afterend', redirectArea);
+        } else if (redirectArea.previousElementSibling !== enabledArea) {
+            enabledArea.insertAdjacentElement('afterend', redirectArea);
         }
-        return { hr, enabledArea, redirectArea };
+
+        return { permanentHr, enabledArea, redirectArea };
     }
 
-    // Establish a long‑lived connection so background can know the popup is open (MV3-safe)
-    const popupPort = chrome.runtime.connect({ name: 'popup' });
+    // Ensure a temporary separator after whichever message area is active
+    function ensureTempSeparator() {
+        const { enabledArea, redirectArea } = ensureMessageAreas();
+        let tempHr = document.getElementById('message-temp-hr');
+        if (!tempHr) {
+            tempHr = document.createElement('hr');
+            tempHr.id = 'message-temp-hr';
+        }
+        // Prefer placing after redirectArea if it has content; else after enabledArea
+        const anchor = (redirectArea && redirectArea.childElementCount > 0) ? redirectArea : enabledArea;
+        if (anchor && anchor.nextElementSibling !== tempHr) {
+            anchor.insertAdjacentElement('afterend', tempHr);
+        }
+    }
+
+    function removeTempSeparator() {
+        const tempHr = document.getElementById('message-temp-hr');
+        if (tempHr) tempHr.remove();
+    }
 
 
     // --- Helpers for chrome APIs ---
@@ -338,6 +376,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const el = redirectArea.querySelector('.redirect-message');
         if (el?.dataset.intervalId) clearInterval(parseInt(el.dataset.intervalId));
         redirectArea.innerHTML = '';
+
+        // Remove the temporary separator if present
+        const tempHr = document.getElementById('message-temp-hr');
+        if (tempHr) tempHr.remove();
     }
 
     async function showRedirectPlaceholder() {
@@ -364,6 +406,9 @@ document.addEventListener('DOMContentLoaded', () => {
         placeholder.dataset.intervalId = String(interval);
 
         redirectArea.appendChild(placeholder);
+
+        // Add a temporary hr between messages and manual section while redirect is pending
+        ensureTempSeparator();
     }
 
     function clearEnabledMessage() {
@@ -371,14 +416,41 @@ document.addEventListener('DOMContentLoaded', () => {
         enabledArea.innerHTML = '';
     }
 
-    function showEnabledMessage(extension) {
-        const { enabledArea } = ensureMessageAreas();
+    // Auto-clear timer for enabled message (for when "Open mods tab" is OFF)
+    let enabledAutoClearTimerId = null;
+
+    async function showEnabledMessage(extension) {
+        const { enabledArea, redirectArea } = ensureMessageAreas();
         // replace content in fixed area; do not touch redirect placeholder
         enabledArea.innerHTML = '';
         const d = document.createElement('div');
         d.id = 'enabledMessage';
         d.innerHTML = `Enabled Mod: <span class="mod-name">${escapeHtml(extension.name)}</span>`;
         enabledArea.appendChild(d);
+
+        // If "Open mods tab" is OFF, ensure the temp hr and auto-remove both after 5s
+        const st = await storageGet('toggleOpenModsTabChecked');
+        const openModsEnabled = !!st.toggleOpenModsTabChecked;
+
+        // Clear any previous auto-clear timer
+        if (enabledAutoClearTimerId) {
+            clearTimeout(enabledAutoClearTimerId);
+            enabledAutoClearTimerId = null;
+        }
+
+        if (!openModsEnabled) {
+            // Create/ensure separator even when not redirecting
+            ensureTempSeparator();
+
+            enabledAutoClearTimerId = setTimeout(() => {
+                // Remove enabled message and temp separator after 5 seconds
+                clearEnabledMessage();
+                // Also clear any stray redirect content if present
+                if (redirectArea) redirectArea.innerHTML = '';
+                removeTempSeparator();
+                enabledAutoClearTimerId = null;
+            }, 5000);
+        }
     }
 
     // --- Randomize action ---
@@ -392,7 +464,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const r = await sendMsg('randomizeMods');
         if (r?.status === 'success') {
             if (r.enabledExtension) {
-                showEnabledMessage(r.enabledExtension);
+                await showEnabledMessage(r.enabledExtension);
                 await refreshCurrentMod();
             }
             console.log('Manual randomize request sent; background processing.');
@@ -542,7 +614,7 @@ document.addEventListener('DOMContentLoaded', () => {
             refreshCurrentMod();
             console.log('Popup received randomizationCompleted runtime message');
         } else if (msg?.action === 'redirectingNow') {
-            // Clear redirect message exactly when redirect starts
+            // Clear redirect message exactly when redirect starts (keeps the permanent hr intact)
             removeRedirectMessage();
             console.log('Popup received redirectingNow -> removed redirect message');
         }
@@ -554,7 +626,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (changes.currentMod) refreshCurrentMod();
         if (changes.detectedModList || changes.profiles || changes.profilesOrder || changes.autoModIdentificationChecked) {
             // re-render everything
-            (async () => {
+            (async() => {
                 await loadAndRenderProfiles();
                 await renderExtensionList();
             })();
@@ -566,7 +638,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Prevent default submit behavior
         document.getElementById('modForm')?.addEventListener('submit', e => e.preventDefault());
 
-        // Stabilize areas on open; do not show any messages yet
+        // Stabilize areas on open; leave the permanent hr as-is
         ensureMessageAreas();
         clearEnabledMessage();
         removeRedirectMessage();
