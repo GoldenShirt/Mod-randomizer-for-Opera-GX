@@ -359,7 +359,7 @@ input:checked + .slider:before {
 }
 #message-hr{
     margin-top: 4px;
-    margin-bottom: 4px;
+    margin-bottom: 0px;
 }
 /* ===== Messages ===== */
 #enabledMessage {

@@ -369,11 +369,19 @@ document.addEventListener('DOMContentLoaded', () => {
         for (const id of profileList) if (!seen.has(id)) { order.push(id); seen.add(id); }
         for (const d of detected) if (!seen.has(d.id)) { order.push(d.id); seen.add(d.id); }
 
+        // Alphabetic sort by mod name (case-insensitive), keeping Unknowns grouped by their label
+        const collator = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true });
+        const sortedOrder = order.slice().sort((a, b) => {
+            const nameA = (detectedMap.get(a) || 'Unknown Mod (not detected)');
+            const nameB = (detectedMap.get(b) || 'Unknown Mod (not detected)');
+            return collator.compare(nameA, nameB);
+        });
+
         // Render list
         els.extensionList.innerHTML = '';
         els.extensionList.classList.toggle('disabled', randomizeAll);
 
-        for (const id of order) {
+        for (const id of sortedOrder) {
             const name = detectedMap.get(id) || 'Unknown Mod (not detected)';
             const li = document.createElement('li');
             li.dataset.extid = id;
@@ -403,7 +411,7 @@ document.addEventListener('DOMContentLoaded', () => {
             els.extensionList.appendChild(li);
         }
 
-        console.log(`Rendered manual list for profile ${active} entries ${order.length} (detected=${detected.length}, randomizeAll=${randomizeAll})`);
+        console.log(`Rendered manual list for profile ${active} entries ${sortedOrder.length} (detected=${detected.length}, randomizeAll=${randomizeAll})`);
     }
 
     // When a checkbox changes: save checked ids to active profile but KEEP order in profilesOrder (don't remove unchecked)
@@ -713,6 +721,10 @@ document.addEventListener('DOMContentLoaded', () => {
             await sendMsg('toggleRandomizeOnSetTimeChecked', { value: inputEl.checked });
             // Removed extra "Requested toggleRandomizeOnSetTimeChecked" log to avoid duplicate log lines
         }
+        if (key === 'toggleOpenModsTabChecked' && !inputEl.checked) {
+            // If the user turns off "Open mods tab" while a redirect message is showing, clear the placeholder now
+            removeRedirectMessage();
+        }
     }
     // --- Event wiring ---
     els.searchBar.addEventListener('input', onSearchInput);
@@ -740,6 +752,10 @@ document.addEventListener('DOMContentLoaded', () => {
             showEnabledMessage(msg.enabledExtension);
             refreshCurrentMod();
             console.log('Popup received randomizationCompleted runtime message');
+            // Acknowledge receipt so background can clear pendingRandomization safely
+            if (msg.pendingId) {
+                sendMsg('randomizationAck', { pendingId: msg.pendingId });
+            }
         } else if (msg?.action === 'redirectingNow') {
             // Clear redirect message exactly when redirect starts (keeps the permanent hr intact)
             removeRedirectMessage();
