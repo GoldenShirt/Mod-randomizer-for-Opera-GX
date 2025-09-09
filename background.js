@@ -117,17 +117,20 @@ async function identifyModExtensions() {
     return identifyInFlight;
 }
 
-// ---------- Profiles ----------
 async function ensureDefaults() {
     const s = await storage.get(['profiles', 'activeProfile']);
     if (!s.profiles) {
-        const prev = await storage.get('modExtensionIds');
-        const defaultList = Array.isArray(prev.modExtensionIds) ? prev.modExtensionIds : [];
-        const profiles = { Default: defaultList };
+        const detected = await storage.get('detectedModList');
+        const detectedIds = Array.isArray(detected.detectedModList)
+            ? detected.detectedModList.map(m => m.id)
+            : [];
+
+        const profiles = { Default: detectedIds };
         await storage.set({ profiles, activeProfile: 'Default' });
-        console.log('Initialized default profiles');
+        console.log(`Initialized default profile with ${detectedIds.length} mods`);
     }
 }
+
 
 
 // Add only newly detected mods to all profiles when randomize-all is OFF.

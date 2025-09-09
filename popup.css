@@ -1,10 +1,46 @@
+/* ===== Theme Variables ===== */
+:root {
+    --bg: #1a1a1d;
+    --bg-alt: #222;
+    --bg-input: #111;
+    --border: #333;
+    --text: #f5f5f5;
+    --accent: #00d4ff;
+    --accent-contrast: #111;
+    --highlight: #ff4081;
+    --highlight-hover: #ff79a1;
+    --success: #4caf50;
+    --overlay-bg: rgba(0, 0, 0, 0.75);
+    --muted: #aaa;
+    --scrollbar: #555;
+    --scrollbar-hover: #888;
+}
+
+/* ===== Light Mode Variables ===== */
+body.light-mode {
+    --bg: #fafafa;
+    --bg-alt: #fff;
+    --bg-input: #f2f2f2;
+    --border: #ccc;
+    --text: #111;
+    --accent: #0078d7;
+    --accent-contrast: #fff;
+    --highlight: #e91e63;
+    --highlight-hover: #f06292;
+    --success: #2e7d32;
+    --overlay-bg: rgba(255, 255, 255, 0.8);
+    --muted: #555;
+    --scrollbar: #bbb;
+    --scrollbar-hover: #888;
+}
+
 /* ===== Base Layout ===== */
 body {
     width: 24rem;
     margin: 0;
     font-family: "Segoe UI", Arial, sans-serif;
-    background-color: #1a1a1d;
-    color: #f5f5f5;
+    background-color: var(--bg);
+    color: var(--text);
     font-size: 15px; /* slightly bigger globally */
 }
 
@@ -16,28 +52,28 @@ body {
 h2 {
     text-align: center;
     font-size: 1.6rem;
-    color: #00d4ff;
+    color: var(--accent);
     margin: 0;
 }
 
 #current-mod {
     text-align: center;
     font-size: 1.1rem;
-    margin: 0.25rem 0 0.25rem 0;
-    color: #ff4081;
+    margin: 0.25rem 0;
+    color: var(--highlight);
 }
 
 /* ===== Fieldsets ===== */
 fieldset {
-    border: 1px solid #333;
+    border: 1px solid var(--border);
     border-radius: 8px;
     padding: 0.9rem;
-    margin-bottom: 0.6rem; /* tighter spacing */
-    background-color: #222;
+    margin-bottom: 0.6rem;
+    background-color: var(--bg-alt);
 }
 
 legend {
-    color: #00d4ff;
+    color: var(--accent);
     font-weight: bold;
     padding: 0 0.5rem;
     font-size: 1rem;
@@ -47,16 +83,15 @@ legend {
 .profile-section {
     padding: 0.6rem;
     margin-bottom: 0;
-
 }
 
 #profileSelect {
     width: 100%;
     padding: 0.6rem;
     border-radius: 6px;
-    border: 1px solid #444;
-    background-color: #111;
-    color: #f5f5f5;
+    border: 1px solid var(--border);
+    background-color: var(--bg-input);
+    color: var(--text);
     font-size: 1rem;
     cursor: pointer;
     transition: border-color 0.2s, box-shadow 0.2s;
@@ -64,8 +99,8 @@ legend {
 
 #profileSelect:hover,
 #profileSelect:focus {
-    border-color: #00d4ff;
-    box-shadow: 0 0 6px #00d4ff;
+    border-color: var(--accent);
+    box-shadow: 0 0 6px var(--accent);
 }
 
 .profile-buttons {
@@ -80,15 +115,15 @@ legend {
     font-size: 0.95rem;
     border: none;
     border-radius: 5px;
-    background-color: #333;
-    color: #f5f5f5;
+    background-color: var(--border);
+    color: var(--text);
     cursor: pointer;
     transition: background 0.2s, color 0.2s;
 }
 
 .profile-buttons button:hover {
-    background-color: #00d4ff;
-    color: #111;
+    background-color: var(--accent);
+    color: var(--accent-contrast);
 }
 
 /* ===== Automatic Controls ===== */
@@ -105,23 +140,22 @@ legend {
     margin-bottom: 0.6rem;
 }
 
-/* Vertically match the switch height for the label text */
 .switch-label > span {
     display: inline-block;
-    line-height: 22px; /* match switch height */
+    line-height: 22px;
 }
 
 .switch-label:hover {
-    color: #00d4ff;
+    color: var(--accent);
 }
 
 /* Switch styling */
 .switch {
     position: relative;
     display: inline-block;
-    width: 47px;              /* reduced to ~2/3 of 56px */
+    width: 47px;
     height: 22px;
-    transform: translateY(2px); /* keep alignment with text */
+    transform: translateY(2px);
 }
 
 .switch input {
@@ -133,7 +167,7 @@ legend {
 .slider {
     position: absolute;
     top: 0; left: 0; right: 0; bottom: 0;
-    background-color: #444;
+    background-color: var(--border);
     border-radius: 20px;
     transition: 0.3s;
 }
@@ -149,15 +183,15 @@ legend {
 }
 
 input:checked + .slider {
-    background-color: #00d4ff;
+    background-color: var(--accent);
 }
 
 input:checked + .slider:before {
-    transform: translateX(25px); /* 37 - 18 - 4 = 15px */
+    transform: translateX(25px);
 }
 
 .switch:hover .slider {
-    box-shadow: 0 0 6px #00d4ff;
+    box-shadow: 0 0 6px var(--accent);
     cursor: pointer;
 }
 
@@ -166,16 +200,15 @@ input:checked + .slider:before {
     display: flex;
     margin-top: 0.5rem;
     height: 45px;
-
 }
 
 .time-setting-container input,
 .time-setting-container select {
     flex: 1;
     padding: 0.5rem;
-    border: 1px solid #444;
-    background-color: #111;
-    color: #f5f5f5;
+    border: 1px solid var(--border);
+    background-color: var(--bg-input);
+    color: var(--text);
     font-size: 1rem;
     transition: border-color 0.2s, box-shadow 0.2s;
 }
@@ -193,8 +226,8 @@ input:checked + .slider:before {
 .time-setting-container select:hover,
 .time-setting-container input:focus,
 .time-setting-container select:focus {
-    border-color: #00d4ff;
-    box-shadow: 0 0 6px #00d4ff;
+    border-color: var(--accent);
+    box-shadow: 0 0 6px var(--accent);
 }
 
 /* ===== Randomize button ===== */
@@ -204,7 +237,7 @@ input:checked + .slider:before {
     padding: 1rem;
     font-size: 1.2rem;
     font-weight: bold;
-    background-color: #ff4081;
+    background-color: var(--highlight);
     color: #fff;
     border: 2px solid transparent;
     border-radius: 8px;
@@ -213,29 +246,28 @@ input:checked + .slider:before {
 }
 
 #randomizeButton:hover {
-    background-color: #ff79a1;
-    border-color: #ff4081;
-    box-shadow: 0 0 8px #ff4081;
+    background-color: var(--highlight-hover);
+    border-color: var(--highlight);
+    box-shadow: 0 0 8px var(--highlight);
 }
 
 /* ===== Manual Mods ===== */
 .manual-section {
-    position: relative; /* needed for overlay */
+    position: relative;
     padding: 0.8rem;
     border-radius: 8px;
     overflow: visible;
 }
 
-/* Search bar */
 #searchBar {
-    width: 95%; /* prevent spilling out */
+    width: 95%;
     max-width: 100%;
     padding: 0.6rem;
     margin-bottom: 0.6rem;
     border-radius: 6px;
-    border: 1px solid #444;
-    background-color: #111;
-    color: #f5f5f5;
+    border: 1px solid var(--border);
+    background-color: var(--bg-input);
+    color: var(--text);
     transition: border-color 0.2s, box-shadow 0.2s;
     display: block;
     margin-left: auto;
@@ -244,12 +276,11 @@ input:checked + .slider:before {
 
 #searchBar:hover,
 #searchBar:focus {
-    border-color: #00d4ff;
-    box-shadow: 0 0 6px #00d4ff;
+    border-color: var(--accent);
+    box-shadow: 0 0 6px var(--accent);
 }
 
 #extensionList {
-    /* Let the popup handle scrolling to avoid nested scrollbars */
     max-height: none;
     overflow: visible;
     list-style: none;
@@ -258,20 +289,19 @@ input:checked + .slider:before {
     position: relative;
 }
 
-/* Custom checkboxes */
 #extensionList li {
     display: flex;
     align-items: center;
     gap: 0.6rem;
     padding: 0.4rem 0.5rem;
-    border-bottom: 1px solid #333;
+    border-bottom: 1px solid var(--border);
 }
 
 #extensionList input[type="checkbox"] {
     appearance: none;
     width: 18px;
     height: 18px;
-    border: 2px solid #00d4ff;
+    border: 2px solid var(--accent);
     border-radius: 4px;
     background-color: transparent;
     cursor: pointer;
@@ -279,102 +309,69 @@ input:checked + .slider:before {
 }
 
 #extensionList input[type="checkbox"]:checked {
-    background-color: #00d4ff;
+    background-color: var(--accent);
 }
 
 #extensionList input[type="checkbox"]:hover {
     transform: scale(1.1);
 }
 
-/* Darken whole fieldset area, including behind the legend */
+/* Disabled overlays */
 .manual-section.disabled::before {
     content: "";
     position: absolute;
-    left: 0;
-    right: 0;
-    top: -0.9em;          /* extend up to cover legend area */
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.75);
-    pointer-events: auto; /* block clicks/scroll */
+    left: 0; right: 0; top: -0.9em; bottom: 0;
+    background: var(--overlay-bg);
+    pointer-events: auto;
     border-radius: 8px;
     z-index: 2;
-    cursor: not-allowed;  /* visual cue */
+    cursor: not-allowed;
 }
 
-
-/* Message layer above blackout */
 .manual-section.disabled::after {
     content: "Randomize all mods is enabled";
     position: absolute;
     inset: 0;
-    color: #aaa;
+    color: var(--muted);
     font-size: 0.9rem;
     display: flex;
-    justify-content: center;   /* center horizontally */
-    align-items: flex-start;    /* stick to the top so it's visible immediately */
+    justify-content: center;
+    align-items: flex-start;
     text-align: center;
-    pointer-events: auto; /* block hover/focus on inputs beneath */
+    pointer-events: auto;
     border-radius: 8px;
-    padding: 1rem 1rem 1rem; /* top padding to avoid hugging the edge */
-    box-sizing: border-box;
     z-index: 3;
-    cursor: not-allowed;  /* visual cue */
+    cursor: not-allowed;
+    padding: 1rem;
     margin-top: 15px;
 }
-/* Legend on top, no background */
+
 .manual-section legend {
     position: relative;
-    z-index: 4;      /* keep text above overlays */
+    z-index: 4;
     background: transparent;
 }
 
-
-
-/* Custom checkboxes */
-#extensionList li {
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-    padding: 0.4rem 0.5rem;
-    border-bottom: 1px solid #333;
-}
-
-#extensionList input[type="checkbox"] {
-    appearance: none;
-    width: 18px;
-    height: 18px;
-    border: 2px solid #00d4ff;
-    border-radius: 4px;
-    background-color: transparent;
-    cursor: pointer;
-    transition: background 0.2s, transform 0.2s;
-}
-
-#extensionList input[type="checkbox"]:checked {
-    background-color: #00d4ff;
-}
-
-#extensionList input[type="checkbox"]:hover {
-    transform: scale(1.1);
-}
-#message-hr{
+#message-hr {
     margin-top: 4px;
     margin-bottom: 0px;
 }
+
 /* ===== Messages ===== */
 #enabledMessage {
     font-size: 1rem;
     text-align: center;
-    color: #4caf50;
+    color: var(--success);
     margin: 0.6rem 0;
 }
 
 .redirect-message {
     font-size: 0.9rem;
     text-align: center;
-    color: #00d4ff;
+    color: var(--accent);
 }
-/* Disabled state for profile section when randomize-all is on */
+
+/* Disabled state for profile section */
 .profile-section.disabled {
     position: relative;
     opacity: 0.6;
@@ -384,8 +381,8 @@ input:checked + .slider:before {
     content: "Randomize all mods is enabled";
     position: absolute;
     inset: 0;
-    background: rgba(0, 0, 0, 0.75);
-    color: #aaa;
+    background: var(--overlay-bg);
+    color: var(--muted);
     font-size: 0.85rem;
     display: flex;
     justify-content: center;
@@ -402,14 +399,35 @@ input:checked + .slider:before {
     pointer-events: none;
     opacity: 0.5;
 }
+
 /* ===== Scrollbar ===== */
 ::-webkit-scrollbar {
     width: 8px;
 }
 ::-webkit-scrollbar-thumb {
-    background-color: #555;
+    background-color: var(--scrollbar);
     border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-    background-color: #888;
+    background-color: var(--scrollbar-hover);
+}
+/* Auto light/dark based on OperaGX/system setting */
+@media (prefers-color-scheme: light) {
+    body {
+        /* override with light theme vars */
+        --bg: #fafafa;
+        --bg-alt: #fff;
+        --bg-input: #f2f2f2;
+        --border: #ccc;
+        --text: #111;
+        --accent: #0078d7;
+        --accent-contrast: #fff;
+        --highlight: #e91e63;
+        --highlight-hover: #f06292;
+        --success: #2e7d32;
+        --overlay-bg: rgba(255, 255, 255, 0.8);
+        --muted: #555;
+        --scrollbar: #bbb;
+        --scrollbar-hover: #888;
+    }
 }
