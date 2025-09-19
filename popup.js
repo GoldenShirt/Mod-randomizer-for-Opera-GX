@@ -715,7 +715,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function refreshCurrentMod() {
         const s = await storageGet('currentMod');
         const name = s.currentMod || 'None';
-        els.currentMod.textContent = `Current Mod: ${name}`;
+        els.currentMod.textContent = `Active Mod: ${name}`;
     }
 
     async function consumePendingRandomization() {

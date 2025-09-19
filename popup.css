@@ -195,6 +195,11 @@ input:checked + .slider:before {
     cursor: pointer;
 }
 
+/* Slight inner-left gap for the time input */
+.time-setting-container #timeInput {
+  padding-left: 0.8rem; /* match search field inset */
+}
+
 /* Time input */
 .time-setting-container {
     display: flex;
@@ -205,16 +210,19 @@ input:checked + .slider:before {
 .time-setting-container input,
 .time-setting-container select {
     flex: 1;
-    padding: 0.5rem;
+    padding: 0.60rem;              /* match #searchBar vertical padding */
     border: 1px solid var(--border);
     background-color: var(--bg-input);
     color: var(--text);
     font-size: 1rem;
     transition: border-color 0.2s, box-shadow 0.2s;
+    height: 100%;                  /* make controls fill the container height */
+    box-sizing: border-box;        /* ensure height includes borders/padding */
 }
 
 .time-setting-container input {
     border-radius: 6px 0 0 6px;
+    min-height: 1.7rem;            /* match #searchBar height */
 }
 
 .time-setting-container select {
@@ -222,6 +230,7 @@ input:checked + .slider:before {
     border-radius: 0 6px 6px 0;
 }
 
+/* Keep hover/focus visuals consistent with search bar */
 .time-setting-container input:hover,
 .time-setting-container select:hover,
 .time-setting-container input:focus,
@@ -259,14 +268,90 @@ input:checked + .slider:before {
     overflow: visible;
 }
 
-#searchBar {
+/* Helper text above search bar */
+
+/* Helper text: nudge left and reduce left padding */
+.manual-section .helper-text {
+    position: relative;
+    display: block;
+    margin: 0 auto 0.5rem;
+    max-width: 95%;
+    padding-left: 1.4rem;   /* smaller gap to the text */
+    font-size: 0.9rem;
+    color: var(--muted);
+    line-height: 1.25;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Circle */
+.manual-section .helper-text::before {
+    content: "";
+    position: absolute;
+    left: 0.18rem;  /* slightly left with the overall shift */
+    top: 0.08rem;
+    width: 1.02rem;
+    height: 1.02rem;
+    border: 2px solid var(--accent);
+    border-radius: 50%;
+    box-sizing: border-box;
+    opacity: 0.95;
+}
+
+/* Dot and stem perfectly centered */
+.manual-section .helper-text::after {
+    content: "";
+    position: absolute;
+    left: 0.18rem;
+    top: 0.08rem;
+    width: 1.02rem;
+    height: 1.02rem;
+    border-radius: 50%;
+    background:
+      radial-gradient(circle at 50% 27%, var(--accent) 0 1px, transparent 1.1px),
+      linear-gradient(var(--accent), var(--accent)) 50% 64% / 1.4px 6px no-repeat;
+    opacity: 0.95;
+}
+
+/* Slightly tighter on very narrow widths */
+@media (max-width: 420px) {
+  .manual-section .helper-text {
+    padding-right: 1px;
+    transform: translateX(-6px);
+  }
+}
+
+/* Disabled state */
+.manual-section.disabled .helper-text,
+.manual-section.disabled .helper-text::before,
+.manual-section.disabled .helper-text::after {
+    opacity: 0.6;
+}
+
+/* Align with search input width */
+.manual-section #searchBar {
     width: 95%;
+}
+
+/* When manual section is disabled, mute the helper too (overlay already used) */
+.manual-section.disabled .helper-text {
+    color: var(--muted);
+    opacity: 0.7;
+}
+
+#searchBar {
+  padding-left: 0.8rem; /* subtle extra inset */
+    width: 95%;
+    font-size:1rem;
     max-width: 100%;
-    padding: 0.6rem;
-    margin-bottom: 0.6rem;
+    padding-top: 0.60rem;    /* +0.04rem (~0.6px) */
+    padding-bottom: 0.60rem; /* +0.04rem (~0.6px) */
+    margin-bottom: 0rem;
     border-radius: 6px;
     border: 1px solid var(--border);
     background-color: var(--bg-input);
+    min-height: 1.7rem;    /* gentle bump in height */
     color: var(--text);
     transition: border-color 0.2s, box-shadow 0.2s;
     display: block;
