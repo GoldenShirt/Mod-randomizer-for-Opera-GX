@@ -131,6 +131,52 @@ async function ensureDefaults() {
     }
 }
 
+const CATALOG_URL = 'https://raw.githubusercontent.com/GoldenShirt/Mod-randomizer-for-Opera-GX/main/url-catalog.json';
+let catalog = {};
+// Load catalog immediately on background startup
+loadCatalog();
+
+
+// Load static catalog on startup
+async function loadCatalog() {
+    try {
+        const res = await fetch(CATALOG_URL);
+        catalog = await res.json();
+        console.log('Catalog loaded:', Object.keys(catalog).length, 'mods');
+    } catch (err) {
+        console.error('Failed to load catalog:', err);
+    }
+}
+
+// Function to get a mod URL by name
+// Function to get a mod URL by name
+// ---------------------- getModUrlByName ----------------------
+async function getModUrlByName(modName) {
+    console.log(`[getModUrlByName] Looking for URL of mod: "${modName}"`);
+
+    // Check catalog first
+    if (catalog[modName]) {
+        console.log(`[getModUrlByName] Found in catalog:`, catalog[modName].url);
+        return catalog[modName].url;
+    } else {
+        console.log(`[getModUrlByName] Not found in catalog`);
+    }
+
+    // Check newly installed mods
+    const storageData = await chrome.storage.local.get(['newMods']);
+    const newMods = storageData.newMods || {};
+    const found = Object.values(newMods).find(m => m.name === modName);
+    if (found) {
+        console.log(`[getModUrlByName] Found in newMods storage:`, found.url);
+        return found.url;
+    } else {
+        console.log(`[getModUrlByName] Not found in newMods storage`);
+    }
+
+    // Fallback
+    console.warn(`[getModUrlByName] No URL found for "${modName}"`);
+    return null; // temporarily remove fallback to mods/manage
+}
 
 
 // Add only newly detected mods to all profiles when randomize-all is OFF.
@@ -187,73 +233,78 @@ async function addDetectedModsToAllProfiles(autoIdentify /* randomizeAllMods */)
     return { detected: detectedList, profiles };
 }
 // ---------- Randomization ----------
-async function handleModEnableWorkflow(modIdsForRandomization) {
+// ---------------------- handleModEnableWorkflow ----------------------
+async function handleModEnableWorkflow(modIdsForRandomization, uninstallAndReinstall) {
+    console.log(`[handleModEnableWorkflow] Starting workflow. Mods:`, modIdsForRandomization, `uninstallAndReinstall:`, uninstallAndReinstall);
+
     if (!modIdsForRandomization || modIdsForRandomization.length === 0) {
-        console.log('No mods in active profile to randomize.');
+        console.warn('[handleModEnableWorkflow] No mods to randomize');
         return null;
     }
-    const s = await storage.get('lastEnabledModId');
+
+    const s = await storage.get(['lastEnabledModId']);
     const lastEnabled = s.lastEnabledModId;
     const all = await management.getAll();
     const mods = all.filter(e => modIdsForRandomization.includes(e.id));
-    if (!mods.length) return null;
-    await Promise.all(mods.filter(m => m.enabled).map(m => management.setEnabled(m.id, false)));
+
+    if (!mods.length) {
+        console.warn('[handleModEnableWorkflow] No mods found in management');
+        return null;
+    }
+
+    // Disable currently enabled mods
+    const currentlyEnabled = mods.filter(m => m.enabled);
+    await Promise.all(currentlyEnabled.map(m => management.setEnabled(m.id, false)));
+
+    // Pick new candidate (not last enabled)
     const candidates = mods.filter(m => m.id !== lastEnabled);
     if (!candidates.length) return null;
-    const selected = candidates[Math.floor(Math.random() * candidates.length)];
-    await management.setEnabled(selected.id, true);
-    await storage.set({ lastEnabledModId: selected.id, currentMod: selected.name });
-    console.log(`Randomize -> enabled ${selected.name}`);
-    return { id: selected.id, name: selected.name };
-}
 
+    const selected = candidates[Math.floor(Math.random() * candidates.length)];
+    console.log(`[handleModEnableWorkflow] Selected mod: ${selected.name} (id: ${selected.id})`);
+
+    if (uninstallAndReinstall) {
+        // Uninstall and reinstall flow
+        const reinstallUrl = await getModUrlByName(selected.name);
+        console.log(`[handleModEnableWorkflow] Sending uninstall request to popup for mod: ${selected.name}`);
+        await storage.set({ lastEnabledModId: selected.id, currentMod: selected.name });
+        return { id: selected.id, name: selected.name, reinstallUrl, uninstallViaPopup: true };
+    } else {
+        // Enable flow (old logic)
+        await management.setEnabled(selected.id, true);
+        await storage.set({ lastEnabledModId: selected.id, currentMod: selected.name });
+        console.log(`[handleModEnableWorkflow] Enabled mod: ${selected.name}`);
+
+        // Return with modsTabUrl for redirect
+        return {
+            id: selected.id,
+            name: selected.name,
+            modsTabUrl: 'opera://configure/mods/manage'
+        };
+    }
+}// ---------------------- executeRandomization ----------------------
 async function executeRandomization(source = 'unknown', redirectDelayMs = 3000) {
+    console.log(`[executeRandomization] Source: ${source}`);
     try {
-        if (randomizationInProgress && source !== 'manual') return null;
-        const now = nowMs();
-        const s = await storage.get('lastRandomizationTime');
-        let lastRandomizationTime = s.lastRandomizationTime;
-        if (lastRandomizationTime && (now - lastRandomizationTime) > MAX_LAST_RANDOMIZATION_AGE) {
-            await storage.remove('lastRandomizationTime');
-            lastRandomizationTime = null;
-        }
-        if (source !== 'manual' && lastRandomizationTime && (now - lastRandomizationTime) < MIN_COOLDOWN_MS) {
-            console.log('Skipping randomization — cooldown');
-            return null;
-        }
-        if (source !== 'manual') {
-            randomizationInProgress = true;
-            await storage.set({ lastRandomizationTime: now });
-        }
-        const { profiles = {}, activeProfile = 'Default', toggleOpenModsTabChecked = true, autoModIdentificationChecked = false } =
-            await storage.get(['profiles', 'activeProfile', 'toggleOpenModsTabChecked', 'autoModIdentificationChecked']);
+        const s = await storage.get(['profiles', 'activeProfile', 'uninstallAndReinstallChecked', 'autoModIdentificationChecked']);
         const { detectedModList = [] } = await storage.get('detectedModList');
-        const useAll = !!autoModIdentificationChecked;
-        const activeList = useAll ? detectedModList.map(m => m.id) : (profiles[activeProfile] || []);
-        if (!activeList.length) return null;
-        const result = await handleModEnableWorkflow(activeList);
+        const useAll = !!s.autoModIdentificationChecked;
+        const activeList = useAll ? detectedModList.map(m => m.id) : (s.profiles?.[s.activeProfile] || []);
+
+        const result = await handleModEnableWorkflow(activeList, s.uninstallAndReinstallChecked);
+
         if (result) {
             const pending = { enabledExtension: result, timestamp: nowMs() };
             await storage.set({ pendingRandomization: pending });
             tryDeliverToPopup({ action: 'randomizationCompleted', enabledExtension: result, pendingId: pending.timestamp });
         }
-        if (result && toggleOpenModsTabChecked) {
-            if (redirectTimeout) clearTimeout(redirectTimeout);
-            redirectTimeout = setTimeout(async () => {
-                await tryDeliverToPopup({ action: 'redirectingNow' });
-                chrome.tabs.create({ url: 'opera://mods/manage' }, () => { redirectTimeout = null; });
-            }, redirectDelayMs);
-        }
-        if (source !== 'manual') randomizationInProgress = false;
+
         return result;
     } catch (err) {
-        console.error('executeRandomization error', err);
-        if (source !== 'manual') randomizationInProgress = false;
+        console.error('[executeRandomization] error', err);
         return null;
     }
 }
-
-
 
 // ---------- Alarms & Scheduling ----------
 async function setRandomizeTime(minutes) {
@@ -516,7 +567,7 @@ chrome.runtime.onInstalled.addListener(async details => {
     await storage.set({
       toggleRandomizeOnStartupChecked: false,
       autoModIdentificationChecked: true, // randomize-all: ON by default
-      toggleOpenModsTabChecked: true,
+      uninstallAndReinstallChecked: true,
       toggleRandomizeOnSetTimeChecked: false,
       randomizeTime: 0,
       currentMod: 'None'

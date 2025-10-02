@@ -13,7 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
         newProfileBtn: document.getElementById('newProfileBtn'),
         deleteProfileBtn: document.getElementById('deleteProfileBtn'),
         autoModToggle: document.getElementById('randomizeAllMods'),
-        openModsToggle: document.getElementById('toggleOpenModsTab'),
+        openModsToggle: document.getElementById('uninstallAndReinstall'),
         startupToggle: document.getElementById('toggleRandomizeOnStartup'),
         setTimeToggle: document.getElementById('toggleRandomizeOnSetTime'),
         timeInput: document.getElementById('timeInput'),
@@ -25,25 +25,66 @@ document.addEventListener('DOMContentLoaded', () => {
         message: document.getElementById('message'),
     };
 
+
+
     // --- Port connection for robust messaging ---
+// THIS MUST BE AT THE TOP LEVEL (global scope)
     const port = chrome.runtime.connect({ name: 'popup' });
-    port.onMessage.addListener((msg) => {
+
+// Global timers
+
+
+    port.onMessage.addListener(async (msg) => {
         if (!msg || !msg.action) return;
         if (msg.action === 'randomizationCompleted' && msg.enabledExtension) {
-            showEnabledMessage(msg.enabledExtension);
+            // Get the actual state
+            const st = await chrome.storage.local.get('uninstallAndReinstallChecked');
+            const uninstallAndReinstall = !!st.uninstallAndReinstallChecked;
+
+            console.log('Port received mod:', msg.enabledExtension);
+            console.log('Uninstall mode:', uninstallAndReinstall);
+
+            await showModMessage(msg.enabledExtension, uninstallAndReinstall);
+
+            if (uninstallAndReinstall) {
+                // Uninstall & reinstall flow
+                console.log('Reinstall URL:', msg.enabledExtension.reinstallUrl);
+
+                // DON'T show redirect message in uninstall mode
+                // Just show the button
+                if (msg.enabledExtension.reinstallUrl) {
+                    console.log('Showing uninstall button for:', msg.enabledExtension.reinstallUrl);
+                    showUninstallButton(msg.enabledExtension);
+                }
+            } else {
+                // Enable flow - redirect to mods tab after 3 seconds
+                console.log('Enable mode - will redirect to mods tab');
+
+                // Show animated redirect message ONLY in enable mode
+                showRedirectMessage();
+
+                if (msg.enabledExtension.modsTabUrl) {
+                    redirectTimeoutId = setTimeout(() => {
+                        console.log('Redirecting to mods tab:', msg.enabledExtension.modsTabUrl);
+                        chrome.tabs.create({ url: msg.enabledExtension.modsTabUrl });
+                        window.close(); // Close popup after opening tab
+                        redirectTimeoutId = null;
+                    }, 3000);
+                }
+            }
+
             refreshCurrentMod();
             console.log('Popup received randomizationCompleted via port');
-            try { port.postMessage({ action: 'randomizationAck', pendingId: msg.pendingId }); }
-            catch (e) { chrome.runtime.sendMessage({ action: 'randomizationAck', pendingId: msg.pendingId }); }
+            try {
+                port.postMessage({action: 'randomizationAck', pendingId: msg.pendingId});
+            } catch (e) {
+                chrome.runtime.sendMessage({action: 'randomizationAck', pendingId: msg.pendingId});
+            }
         } else if (msg.action === 'redirectingNow') {
             removeRedirectMessage();
             console.log('Popup received redirectingNow via port');
         }
     });
-    port.postMessage({ action: 'popupReady' });
-
-
-
     // Track which profile the UI is currently rendering/working with to avoid saving to a wrong profile on quick switches
     let currentProfile = null;
     let renderLock = false; // prevents mid-save re-renders that can drop fast clicks
@@ -59,55 +100,8 @@ document.addEventListener('DOMContentLoaded', () => {
     //   [redirectArea]
     //   [temporary hr (#message-temp-hr)]
     //   [Manual section...]
-    function ensureMessageAreas() {
-        // Permanent separator that already exists in HTML
-        let permanentHr = document.getElementById('message-hr');
-        if (!permanentHr) {
-            permanentHr = document.createElement('hr');
-            permanentHr.id = 'message-hr';
-            els.randomizeButton.insertAdjacentElement('afterend', permanentHr);
-        }
 
-        // Ensure enabledArea immediately after the permanent hr
-        let enabledArea = document.getElementById('enabled-area');
-        if (!enabledArea) {
-            enabledArea = document.createElement('div');
-            enabledArea.id = 'enabled-area';
-            permanentHr.insertAdjacentElement('afterend', enabledArea);
-        } else {
-            // Make sure it's placed right after the permanent hr
-            if (permanentHr.nextElementSibling !== enabledArea) {
-                permanentHr.insertAdjacentElement('afterend', enabledArea);
-            }
-        }
 
-        // Ensure redirectArea right after enabledArea
-        let redirectArea = document.getElementById('redirect-area');
-        if (!redirectArea) {
-            redirectArea = document.createElement('div');
-            redirectArea.id = 'redirect-area';
-            enabledArea.insertAdjacentElement('afterend', redirectArea);
-        } else if (redirectArea.previousElementSibling !== enabledArea) {
-            enabledArea.insertAdjacentElement('afterend', redirectArea);
-        }
-
-        return { permanentHr, enabledArea, redirectArea };
-    }
-
-    // Ensure a temporary separator after whichever message area is active
-    function ensureTempSeparator() {
-        const { enabledArea, redirectArea } = ensureMessageAreas();
-        let tempHr = document.getElementById('message-temp-hr');
-        if (!tempHr) {
-            tempHr = document.createElement('hr');
-            tempHr.id = 'message-temp-hr';
-        }
-        // Prefer placing after redirectArea if it has content; else after enabledArea
-        const anchor = (redirectArea && redirectArea.childElementCount > 0) ? redirectArea : enabledArea;
-        if (anchor && anchor.nextElementSibling !== tempHr) {
-            anchor.insertAdjacentElement('afterend', tempHr);
-        }
-    }
 
     function removeTempSeparator() {
         const tempHr = document.getElementById('message-temp-hr');
@@ -493,23 +487,38 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- Redirect placeholder & messages ---
+    function showRedirectMessage() {
+        const { redirectArea } = ensureMessageAreas();
+
+        // Clear any existing redirect message
+        redirectArea.innerHTML = '';
+
+        const placeholder = document.createElement('p');
+        placeholder.className = 'redirect-message';
+        placeholder.textContent = 'Redirecting to enable checkmarks';
+        let dots = '';
+        const interval = setInterval(() => {
+            dots = dots.length < 3 ? dots + '.' : '';
+            placeholder.textContent = 'Redirecting to enable checkmarks' + dots;
+        }, 300);
+        placeholder.dataset.intervalId = String(interval);
+
+        redirectArea.appendChild(placeholder);
+        ensureTempSeparator();
+    }
+
     function removeRedirectMessage() {
         const { redirectArea } = ensureMessageAreas();
-        // stop any running animation timer
+        // Stop any running animation timer
         const el = redirectArea.querySelector('.redirect-message');
         if (el?.dataset.intervalId) clearInterval(parseInt(el.dataset.intervalId));
         redirectArea.innerHTML = '';
-
-        // Remove the temporary separator if present
-        const tempHr = document.getElementById('message-temp-hr');
-        if (tempHr) tempHr.remove();
     }
 
     async function showRedirectPlaceholder() {
         // Respect the "Open mods tab" toggle; if it's off, do not show the redirect message
-        const st = await storageGet('toggleOpenModsTabChecked');
-        const openModsEnabled = !!st.toggleOpenModsTabChecked;
+        const st = await storageGet('uninstallAndReinstallChecked');
+        const openModsEnabled = !!st.uninstallAndReinstallChecked;
         if (!openModsEnabled) {
             removeRedirectMessage();
             return;
@@ -534,80 +543,244 @@ document.addEventListener('DOMContentLoaded', () => {
         // Add a temporary hr between messages and manual section while redirect is pending
         ensureTempSeparator();
     }
+    function showUninstallButton(mod) {
+        // Find the existing message container
+        const modMessage = document.getElementById('modMessage');
+        if (!modMessage) {
+            console.error('modMessage container not found');
+            return;
+        }
+
+        // Create button container for centering
+        const buttonContainer = document.createElement('div');
+        buttonContainer.style.textAlign = 'center';
+        buttonContainer.style.marginTop = '8px';
+
+        const uninstallBtn = document.createElement('button');
+        uninstallBtn.textContent = 'Uninstall & Go';
+        uninstallBtn.style.padding = '6px 12px';
+        uninstallBtn.style.cursor = 'pointer';
+        uninstallBtn.style.backgroundColor = 'var(--success)';
+        uninstallBtn.style.color = 'white';
+        uninstallBtn.style.border = 'none';
+        uninstallBtn.style.borderRadius = '4px';
+        uninstallBtn.style.fontSize = '13px';
+        uninstallBtn.style.whiteSpace = 'nowrap';
+
+        uninstallBtn.onclick = async () => {
+            try {
+                console.log('Manual uninstall button clicked for:', mod.id);
+
+                // Uninstall FIRST (this opens confirmation dialog and preserves user gesture)
+                console.log('Uninstalling mod:', mod.id);
+                await chrome.management.uninstall(mod.id);
+
+                // After successful uninstall, open the tab
+                // Note: This code may not run if uninstall closes the popup
+                // So we use a different approach below
+
+            } catch (err) {
+                console.error('Error in uninstall flow:', err);
+
+                // If uninstall was cancelled or failed, still try to open the tab
+                if (mod.reinstallUrl) {
+                    console.log('Opening tab after error:', mod.reinstallUrl);
+                    chrome.tabs.create({ url: mod.reinstallUrl });
+                }
+            }
+        };
+
+        // Alternative: Add the URL as data attribute and use background script
+        uninstallBtn.dataset.reinstallUrl = mod.reinstallUrl;
+        uninstallBtn.dataset.modId = mod.id;
+
+        // Better approach: Use chrome.management.uninstall with showConfirmDialog and then redirect
+        uninstallBtn.onclick = () => {
+            console.log('Manual uninstall button clicked for:', mod.id);
+
+            // Open the tab immediately on click (preserves gesture)
+            if (mod.reinstallUrl) {
+                chrome.tabs.create({ url: mod.reinstallUrl });
+            }
+
+            // Then uninstall (shows confirmation dialog)
+            chrome.management.uninstall(mod.id, { showConfirmDialog: true }, () => {
+                if (chrome.runtime.lastError) {
+                    console.error('Uninstall error:', chrome.runtime.lastError);
+                } else {
+                    console.log('Mod uninstalled successfully');
+                    window.close(); // Close popup after uninstall
+                }
+            });
+        };
+
+        buttonContainer.appendChild(uninstallBtn);
+        modMessage.appendChild(buttonContainer);
+    }
+    // Auto-clear timer for enabled message (for when "Open mods tab" is OFF)
+
+    let enabledAutoClearTimerId = null;
+    let uninstallAutoClearTimerId = null;
+    let messageAutoClearTimerId = null;
+// Keep the existing hr below the Randomize button untouched.
+// Create messages right after that hr, and a temporary hr between messages and the manual section.
+// Structure:
+//   [Randomize Button]
+//   [permanent hr (#message-hr)]
+//   [enabledArea]
+//   [redirectArea]
+//   [temporary hr (#message-temp-hr)]
+//   [Manual section...]
+    function ensureMessageAreas() {
+        // Permanent separator that already exists in HTML
+        let permanentHr = document.getElementById('message-hr');
+        if (!permanentHr) {
+            permanentHr = document.createElement('hr');
+            permanentHr.id = 'message-hr';
+            els.randomizeButton.insertAdjacentElement('afterend', permanentHr);
+        }
+        // Ensure enabledArea immediately after the permanent hr
+        let enabledArea = document.getElementById('enabled-area');
+        if (!enabledArea) {
+            enabledArea = document.createElement('div');
+            enabledArea.id = 'enabled-area';
+            permanentHr.insertAdjacentElement('afterend', enabledArea);
+        } else {
+            // Make sure it's placed right after the permanent hr
+            if (permanentHr.nextElementSibling !== enabledArea) {
+                permanentHr.insertAdjacentElement('afterend', enabledArea);
+            }
+        }
+        // Ensure redirectArea right after enabledArea
+        let redirectArea = document.getElementById('redirect-area');
+        if (!redirectArea) {
+            redirectArea = document.createElement('div');
+            redirectArea.id = 'redirect-area';
+            enabledArea.insertAdjacentElement('afterend', redirectArea);
+        } else if (redirectArea.previousElementSibling !== enabledArea) {
+            enabledArea.insertAdjacentElement('afterend', redirectArea);
+        }
+        return { permanentHr, enabledArea, redirectArea };
+    }
+
+// Ensure a temporary separator after whichever message area is active
+    function ensureTempSeparator() {
+        const { enabledArea, redirectArea } = ensureMessageAreas();
+        let tempHr = document.getElementById('message-temp-hr');
+        if (!tempHr) {
+            tempHr = document.createElement('hr');
+            tempHr.id = 'message-temp-hr';
+        }
+        // Prefer placing after redirectArea if it has content; else after enabledArea
+        const anchor = (redirectArea && redirectArea.childElementCount > 0) ? redirectArea : enabledArea;
+        if (anchor && anchor.nextElementSibling !== tempHr) {
+            anchor.insertAdjacentElement('afterend', tempHr);
+        }
+    }
+
+
 
     function clearEnabledMessage() {
         const { enabledArea } = ensureMessageAreas();
         enabledArea.innerHTML = '';
     }
 
-    // Auto-clear timer for enabled message (for when "Open mods tab" is OFF)
-    let enabledAutoClearTimerId = null;
 
-    async function showEnabledMessage(extension) {
+    // Unified message function
+    // Global timers
+    let autoClearTimerId = null;
+    let redirectTimeoutId = null;
+    let redirectIntervalId = null;
+
+// Unified message function
+    async function showModMessage(mod, uninstallAndReinstall) {
         const { enabledArea, redirectArea } = ensureMessageAreas();
-        // replace content in fixed area; do not touch redirect placeholder
+
+        // CRITICAL: Clear ALL previous timers first
+        if (autoClearTimerId) {
+            clearTimeout(autoClearTimerId);
+            autoClearTimerId = null;
+        }
+        if (redirectTimeoutId) {
+            clearTimeout(redirectTimeoutId);
+            redirectTimeoutId = null;
+        }
+        if (redirectIntervalId) {
+            clearInterval(redirectIntervalId);
+            redirectIntervalId = null;
+        }
+
+        // Clear previous messages
         enabledArea.innerHTML = '';
+        redirectArea.innerHTML = '';
+
         const d = document.createElement('div');
-        d.id = 'enabledMessage';
-        d.innerHTML = `Enabled Mod: <span class="mod-name">${escapeHtml(extension.name)}</span>`;
+        d.id = 'modMessage';
+        // Use block layout instead of flex for vertical stacking
+        d.style.textAlign = 'center';
+
+        // Create the message text - both modes are green now
+        const messageText = document.createElement('div');
+        messageText.style.color = 'var(--success)';
+        messageText.innerHTML = uninstallAndReinstall
+            ? `Chose Mod: <span class="mod-name">${escapeHtml(mod.name)}</span>`
+            : `Enabled Mod: <span class="mod-name">${escapeHtml(mod.name)}</span>`;
+        messageText.style.marginBottom = '8px';
+
+        d.appendChild(messageText);
         enabledArea.appendChild(d);
 
-        // If "Open mods tab" is OFF, ensure the temp hr and auto-remove both after 5s
-        const st = await storageGet('toggleOpenModsTabChecked');
-        const openModsEnabled = !!st.toggleOpenModsTabChecked;
-
-        // Clear any previous auto-clear timer
-        if (enabledAutoClearTimerId) {
-            clearTimeout(enabledAutoClearTimerId);
-            enabledAutoClearTimerId = null;
-        }
-
-        if (!openModsEnabled) {
-            // Create/ensure separator even when not redirecting
-            ensureTempSeparator();
-
-            enabledAutoClearTimerId = setTimeout(() => {
-                // Remove enabled message and temp separator after 5 seconds
-                clearEnabledMessage();
-                // Also clear any stray redirect content if present
-                if (redirectArea) redirectArea.innerHTML = '';
-                removeTempSeparator();
-                enabledAutoClearTimerId = null;
-            }, 5000);
-        }
+        // Ensure temp separator
+        ensureTempSeparator();
     }
-
-    // --- Randomize action ---
     async function onRandomizeClick() {
-        console.log('Randomize clicked');
-        // Clear any previous "Enabled Mod" immediately so it doesn’t linger between runs
-        clearEnabledMessage();
-        // Show (and keep) redirect placeholder until background confirms redirect
-        showRedirectPlaceholder();
+        try {
+            const st = await chrome.storage.local.get('uninstallAndReinstallChecked');
+            const uninstallAndReinstall = !!st.uninstallAndReinstallChecked;
 
-        const r = await sendMsg('randomizeMods');
-        if (r?.status === 'success') {
-            if (r.enabledExtension) {
-                await showEnabledMessage(r.enabledExtension);
-                await refreshCurrentMod();
+            const result = await chrome.runtime.sendMessage({
+                action: 'randomizeMods',
+                uninstallAndReinstall
+            });
+
+            if (!result) {
+                showError('No mod returned from background');
+                return;
             }
-            console.log('Manual randomize request sent; background processing.');
-        } else {
-            console.error('Randomize failed', r);
-            showError('Randomize failed: ' + (r?.message || 'unknown'));
-            // remove redirect line if nothing will happen
-            removeRedirectMessage();
+
+            // Show message with mod name
+            await showModMessage(result, uninstallAndReinstall);
+
+            // Redirect safely after 1.5s
+            const fallbackUrl = 'https://store.gx.me/mods/';
+            setTimeout(() => {
+                if (uninstallAndReinstall && result.reinstallUrl) {
+                    window.location.href = result.reinstallUrl;
+                } else if (!uninstallAndReinstall && result.modsTabUrl && !result.modsTabUrl.startsWith('chrome://')) {
+                    window.location.href = result.modsTabUrl;
+                } else {
+                    window.location.href = fallbackUrl;
+                }
+            }, 1500);
+
+        } catch (err) {
+            console.error('Error randomizing mods:', err);
+            showError('Error randomizing mods. See console.');
         }
     }
 
+
+// Helper for HTML escaping
+    function escapeHtml(s) {
+        return (s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+
+// Basic error message
     function showError(text) {
         els.message.textContent = text;
         setTimeout(() => { if (els.message.textContent === text) els.message.textContent = ''; }, 4000);
     }
 
-    function escapeHtml(s) {
-        return (s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-    }
 
     // --- Time input handling ---
     let timeDebounce = null;
@@ -724,7 +897,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (pending && pending.enabledExtension) {
             const age = Date.now() - (pending.timestamp || 0);
             if (age < 30 * 1000) {
-                showEnabledMessage(pending.enabledExtension);
+                await showModMessage(pending.enabledExtension, false); // for enable
                 console.log('Consumed pendingRandomization:', pending);
             }
             // clear it so it doesn't repeat
@@ -752,7 +925,7 @@ document.addEventListener('DOMContentLoaded', () => {
             await sendMsg('toggleRandomizeOnSetTimeChecked', { value: inputEl.checked });
             // Removed extra "Requested toggleRandomizeOnSetTimeChecked" log to avoid duplicate log lines
         }
-        if (key === 'toggleOpenModsTabChecked' && !inputEl.checked) {
+        if (key === 'uninstallAndReinstallChecked' && !inputEl.checked) {
             // If the user turns off "Open mods tab" while a redirect message is showing, clear the placeholder now
             removeRedirectMessage();
         }
@@ -763,7 +936,7 @@ document.addEventListener('DOMContentLoaded', () => {
     els.randomizeButton.addEventListener('click', onRandomizeClick);
 
     els.autoModToggle.addEventListener('change', () => onToggleChange('autoModIdentificationChecked', els.autoModToggle));
-    els.openModsToggle.addEventListener('change', () => onToggleChange('toggleOpenModsTabChecked', els.openModsToggle));
+    els.openModsToggle.addEventListener('change', () => onToggleChange('uninstallAndReinstallChecked', els.openModsToggle));
     els.startupToggle.addEventListener('change', () => onToggleChange('toggleRandomizeOnStartupChecked', els.startupToggle));
     els.setTimeToggle.addEventListener('change', () => onToggleChange('toggleRandomizeOnSetTimeChecked', els.setTimeToggle));
 
@@ -778,14 +951,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Listen for background runtime notifications while popup is open
-    chrome.runtime.onMessage.addListener((msg) => {
+    chrome.runtime.onMessage.addListener(async (msg) => {
         if (msg?.action === 'randomizationCompleted' && msg.enabledExtension) {
-            showEnabledMessage(msg.enabledExtension);
+            await showModMessage(msg.enabledExtension, false); // for enable
             refreshCurrentMod();
             console.log('Popup received randomizationCompleted runtime message');
             // Acknowledge receipt so background can clear pendingRandomization safely
             if (msg.pendingId) {
-                sendMsg('randomizationAck', { pendingId: msg.pendingId });
+                sendMsg('randomizationAck', {pendingId: msg.pendingId});
             }
         } else if (msg?.action === 'redirectingNow') {
             // Clear redirect message exactly when redirect starts (keeps the permanent hr intact)
@@ -840,7 +1013,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // load toggles & time unit & time value
         const s = await storageGet([
             'autoModIdentificationChecked',
-            'toggleOpenModsTabChecked',
+            'uninstallAndReinstallChecked',
             'toggleRandomizeOnStartupChecked',
             'toggleRandomizeOnSetTimeChecked',
             'randomizeTime',
@@ -852,7 +1025,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const randomizeAll = s.autoModIdentificationChecked === undefined ? true : !!s.autoModIdentificationChecked;
 
         if (els.autoModToggle) els.autoModToggle.checked = randomizeAll;
-        els.openModsToggle.checked = s.toggleOpenModsTabChecked === undefined ? true : !!s.toggleOpenModsTabChecked;
+        els.openModsToggle.checked = s.uninstallAndReinstallChecked === undefined ? true : !!s.uninstallAndReinstallChecked;
         els.startupToggle.checked = !!s.toggleRandomizeOnStartupChecked;
         els.setTimeToggle.checked = !!s.toggleRandomizeOnSetTimeChecked;
 
