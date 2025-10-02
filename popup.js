@@ -36,8 +36,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     port.onMessage.addListener(async (msg) => {
         if (!msg || !msg.action) return;
+
         if (msg.action === 'randomizationCompleted' && msg.enabledExtension) {
-            // Get the actual state
             const st = await chrome.storage.local.get('uninstallAndReinstallChecked');
             const uninstallAndReinstall = !!st.uninstallAndReinstallChecked;
 
@@ -46,39 +46,43 @@ document.addEventListener('DOMContentLoaded', () => {
 
             await showModMessage(msg.enabledExtension, uninstallAndReinstall);
 
-            if (uninstallAndReinstall) {
-                // Uninstall & reinstall flow
+            if (uninstallAndReinstall && msg.enabledExtension.reinstallUrl) {
+            // Normal uninstall & reinstall flow
                 console.log('Reinstall URL:', msg.enabledExtension.reinstallUrl);
+                console.log('Showing uninstall button for:', msg.enabledExtension.reinstallUrl);
+            showUninstallButton(msg.enabledExtension);
+        } else {
+            // Either enable-mode OR uninstall mode but URL missing
+            console.log('Redirecting to mods tab because URL missing or normal enable mode');
+            showRedirectMessage();
 
-                // DON'T show redirect message in uninstall mode
-                // Just show the button
-                if (msg.enabledExtension.reinstallUrl) {
-                    console.log('Showing uninstall button for:', msg.enabledExtension.reinstallUrl);
-                    showUninstallButton(msg.enabledExtension);
-                }
-            } else {
-                // Enable flow - redirect to mods tab after 3 seconds
-                console.log('Enable mode - will redirect to mods tab');
+            const modsTabUrl = msg.enabledExtension.modsTabUrl || 'opera://configure/mods/manage';
 
-                // Show animated redirect message ONLY in enable mode
-                showRedirectMessage();
-
-                if (msg.enabledExtension.modsTabUrl) {
-                    redirectTimeoutId = setTimeout(() => {
-                        console.log('Redirecting to mods tab:', msg.enabledExtension.modsTabUrl);
-                        chrome.tabs.create({ url: msg.enabledExtension.modsTabUrl });
-                        window.close(); // Close popup after opening tab
-                        redirectTimeoutId = null;
-                    }, 3000);
+            // ENABLE the mod if URL was missing but uninstallAndReinstall was on
+            if (uninstallAndReinstall && !msg.enabledExtension.reinstallUrl) {
+                try {
+                    console.log('Enabling mod because reinstall URL is missing:', msg.enabledExtension.name);
+                    await chrome.management.setEnabled(msg.enabledExtension.id, true);
+                } catch (err) {
+                    console.error('Error enabling mod fallback:', err);
                 }
             }
 
-            refreshCurrentMod();
-            console.log('Popup received randomizationCompleted via port');
+            redirectTimeoutId = setTimeout(() => {
+                console.log('Redirecting to mods tab:', modsTabUrl);
+                chrome.tabs.create({ url: modsTabUrl });
+                window.close();
+                redirectTimeoutId = null;
+            }, 3000);
+        }
+
+
+        refreshCurrentMod();
+
             try {
-                port.postMessage({action: 'randomizationAck', pendingId: msg.pendingId});
+                port.postMessage({ action: 'randomizationAck', pendingId: msg.pendingId });
             } catch (e) {
-                chrome.runtime.sendMessage({action: 'randomizationAck', pendingId: msg.pendingId});
+                chrome.runtime.sendMessage({ action: 'randomizationAck', pendingId: msg.pendingId });
             }
         } else if (msg.action === 'redirectingNow') {
             removeRedirectMessage();
@@ -696,43 +700,40 @@ document.addEventListener('DOMContentLoaded', () => {
     async function showModMessage(mod, uninstallAndReinstall) {
         const { enabledArea, redirectArea } = ensureMessageAreas();
 
-        // CRITICAL: Clear ALL previous timers first
-        if (autoClearTimerId) {
-            clearTimeout(autoClearTimerId);
-            autoClearTimerId = null;
-        }
-        if (redirectTimeoutId) {
-            clearTimeout(redirectTimeoutId);
-            redirectTimeoutId = null;
-        }
-        if (redirectIntervalId) {
-            clearInterval(redirectIntervalId);
-            redirectIntervalId = null;
-        }
+        // Clear previous timers
+        [autoClearTimerId, redirectTimeoutId, redirectIntervalId].forEach(id => {
+            if (id) clearTimeout(id);
+        });
+        autoClearTimerId = redirectTimeoutId = redirectIntervalId = null;
 
-        // Clear previous messages
         enabledArea.innerHTML = '';
         redirectArea.innerHTML = '';
 
         const d = document.createElement('div');
         d.id = 'modMessage';
-        // Use block layout instead of flex for vertical stacking
         d.style.textAlign = 'center';
 
-        // Create the message text - both modes are green now
         const messageText = document.createElement('div');
         messageText.style.color = 'var(--success)';
-        messageText.innerHTML = uninstallAndReinstall
-            ? `Chose Mod: <span class="mod-name">${escapeHtml(mod.name)}</span>`
-            : `Enabled Mod: <span class="mod-name">${escapeHtml(mod.name)}</span>`;
         messageText.style.marginBottom = '8px';
+
+        // Handle missing URL in uninstall mode
+        if (uninstallAndReinstall && !mod.reinstallUrl) {
+            const name = mod.name ? escapeHtml(mod.name) : '(unknown)';
+            messageText.innerHTML = `URL missing- Enabled: <span class="mod-name">${name}</span>`;
+        } else {
+            const label = uninstallAndReinstall ? 'Chose Mod' : 'Enabled Mod';
+            const name = mod.name ? escapeHtml(mod.name) : '(unknown)';
+            messageText.innerHTML = `${label}: <span class="mod-name">${name}</span>`;
+        }
+
 
         d.appendChild(messageText);
         enabledArea.appendChild(d);
 
-        // Ensure temp separator
         ensureTempSeparator();
     }
+
     async function onRandomizeClick() {
         try {
             const st = await chrome.storage.local.get('uninstallAndReinstallChecked');
