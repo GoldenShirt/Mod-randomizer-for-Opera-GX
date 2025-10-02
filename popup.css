@@ -194,43 +194,45 @@ input:checked + .slider:before {
     box-shadow: 0 0 6px var(--accent);
     cursor: pointer;
 }
-
 /* Slight inner-left gap for the time input */
 .time-setting-container #timeInput {
-  padding-left: 0.8rem; /* match search field inset */
+    padding-left: 0.8rem; /* match search field inset */
 }
 
-/* Time input */
+/* Time input container */
 .time-setting-container {
     display: flex;
     margin-top: 0.5rem;
-    height: 45px;
+    margin-bottom: -7px;
+    height: 50px; /* slightly bigger than original 45px */
 }
 
+/* Inputs/selects inside the container */
 .time-setting-container input,
 .time-setting-container select {
     flex: 1;
-    padding: 0.60rem;              /* match #searchBar vertical padding */
+    padding: 0.7rem;           /* slightly larger vertical padding */
     border: 1px solid var(--border);
     background-color: var(--bg-input);
     color: var(--text);
-    font-size: 1rem;
-    transition: border-color 0.2s, box-shadow 0.2s;
-    height: 100%;                  /* make controls fill the container height */
-    box-sizing: border-box;        /* ensure height includes borders/padding */
+    font-size: 1.03rem;        /* slightly larger text */
+    height: 100%;              /* fills container height */
+    box-sizing: border-box;
 }
 
+/* Left input styling */
 .time-setting-container input {
     border-radius: 6px 0 0 6px;
-    min-height: 1.7rem;            /* match #searchBar height */
+    min-height: 1.9rem;        /* slightly taller than start */
 }
 
+/* Right select styling */
 .time-setting-container select {
     border-left: none;
     border-radius: 0 6px 6px 0;
 }
 
-/* Keep hover/focus visuals consistent with search bar */
+/* Hover/focus styling */
 .time-setting-container input:hover,
 .time-setting-container select:hover,
 .time-setting-container input:focus,
@@ -238,6 +240,7 @@ input:checked + .slider:before {
     border-color: var(--accent);
     box-shadow: 0 0 6px var(--accent);
 }
+
 
 /* ===== Randomize button ===== */
 #randomizeButton {
@@ -454,6 +457,8 @@ input:checked + .slider:before {
     font-size: 0.9rem;
     text-align: center;
     color: var(--accent);
+    margin-bottom: 0;
+    margin-top: 0;
 }
 
 /* Disabled state for profile section */
