@@ -653,7 +653,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     removeRedirectMessage();
                     chrome.tabs.create({url: 'opera://configure/mods/manage'});
                     window.close(); // close the popup safely
-                }, 90000);
+                }, 3000);
 
             }
 
