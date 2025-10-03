@@ -34,60 +34,21 @@ document.addEventListener('DOMContentLoaded', () => {
 // Global timers
 
 
+    // Keep this listener for any OTHER messages the port might be used for.
     port.onMessage.addListener(async (msg) => {
         if (!msg || !msg.action) return;
 
-        if (msg.action === 'randomizationCompleted' && msg.enabledExtension) {
-            const st = await chrome.storage.local.get('uninstallAndReinstallChecked');
-            const uninstallAndReinstall = !!st.uninstallAndReinstallChecked;
+        // The 'randomizationCompleted' logic is now handled by the onRandomizeClick function.
+        // We have removed that block from here to avoid conflicts and to correctly
+        // handle the user gesture. The listener will now ignore that message.
 
-            console.log('Port received mod:', msg.enabledExtension);
-            console.log('Uninstall mode:', uninstallAndReinstall);
-
-            await showModMessage(msg.enabledExtension, uninstallAndReinstall);
-
-            if (uninstallAndReinstall && msg.enabledExtension.reinstallUrl) {
-            // Normal uninstall & reinstall flow
-                console.log('Reinstall URL:', msg.enabledExtension.reinstallUrl);
-                console.log('Showing uninstall button for:', msg.enabledExtension.reinstallUrl);
-            showUninstallButton(msg.enabledExtension);
-        } else {
-            // Either enable-mode OR uninstall mode but URL missing
-            console.log('Redirecting to mods tab because URL missing or normal enable mode');
-            showRedirectMessage();
-
-            const modsTabUrl = msg.enabledExtension.modsTabUrl || 'opera://configure/mods/manage';
-
-            // ENABLE the mod if URL was missing but uninstallAndReinstall was on
-            if (uninstallAndReinstall && !msg.enabledExtension.reinstallUrl) {
-                try {
-                    console.log('Enabling mod because reinstall URL is missing:', msg.enabledExtension.name);
-                    await chrome.management.setEnabled(msg.enabledExtension.id, true);
-                } catch (err) {
-                    console.error('Error enabling mod fallback:', err);
-                }
-            }
-
-            redirectTimeoutId = setTimeout(() => {
-                console.log('Redirecting to mods tab:', modsTabUrl);
-                chrome.tabs.create({ url: modsTabUrl });
-                window.close();
-                redirectTimeoutId = null;
-            }, 3000);
-        }
-
-
-        refreshCurrentMod();
-
-            try {
-                port.postMessage({ action: 'randomizationAck', pendingId: msg.pendingId });
-            } catch (e) {
-                chrome.runtime.sendMessage({ action: 'randomizationAck', pendingId: msg.pendingId });
-            }
-        } else if (msg.action === 'redirectingNow') {
+        // We keep other message handlers if they exist.
+        if (msg.action === 'redirectingNow') {
             removeRedirectMessage();
             console.log('Popup received redirectingNow via port');
         }
+
+        // You can add other 'else if' blocks here for other actions.
     });
     // Track which profile the UI is currently rendering/working with to avoid saving to a wrong profile on quick switches
     let currentProfile = null;
@@ -547,80 +508,6 @@ document.addEventListener('DOMContentLoaded', () => {
         // Add a temporary hr between messages and manual section while redirect is pending
         ensureTempSeparator();
     }
-    function showUninstallButton(mod) {
-        // Find the existing message container
-        const modMessage = document.getElementById('modMessage');
-        if (!modMessage) {
-            console.error('modMessage container not found');
-            return;
-        }
-
-        // Create button container for centering
-        const buttonContainer = document.createElement('div');
-        buttonContainer.style.textAlign = 'center';
-        buttonContainer.style.marginTop = '8px';
-
-        const uninstallBtn = document.createElement('button');
-        uninstallBtn.textContent = 'Uninstall & Go';
-        uninstallBtn.style.padding = '6px 12px';
-        uninstallBtn.style.cursor = 'pointer';
-        uninstallBtn.style.backgroundColor = 'var(--success)';
-        uninstallBtn.style.color = 'white';
-        uninstallBtn.style.border = 'none';
-        uninstallBtn.style.borderRadius = '4px';
-        uninstallBtn.style.fontSize = '13px';
-        uninstallBtn.style.whiteSpace = 'nowrap';
-
-        uninstallBtn.onclick = async () => {
-            try {
-                console.log('Manual uninstall button clicked for:', mod.id);
-
-                // Uninstall FIRST (this opens confirmation dialog and preserves user gesture)
-                console.log('Uninstalling mod:', mod.id);
-                await chrome.management.uninstall(mod.id);
-
-                // After successful uninstall, open the tab
-                // Note: This code may not run if uninstall closes the popup
-                // So we use a different approach below
-
-            } catch (err) {
-                console.error('Error in uninstall flow:', err);
-
-                // If uninstall was cancelled or failed, still try to open the tab
-                if (mod.reinstallUrl) {
-                    console.log('Opening tab after error:', mod.reinstallUrl);
-                    chrome.tabs.create({ url: mod.reinstallUrl });
-                }
-            }
-        };
-
-        // Alternative: Add the URL as data attribute and use background script
-        uninstallBtn.dataset.reinstallUrl = mod.reinstallUrl;
-        uninstallBtn.dataset.modId = mod.id;
-
-        // Better approach: Use chrome.management.uninstall with showConfirmDialog and then redirect
-        uninstallBtn.onclick = () => {
-            console.log('Manual uninstall button clicked for:', mod.id);
-
-            // Open the tab immediately on click (preserves gesture)
-            if (mod.reinstallUrl) {
-                chrome.tabs.create({ url: mod.reinstallUrl });
-            }
-
-            // Then uninstall (shows confirmation dialog)
-            chrome.management.uninstall(mod.id, { showConfirmDialog: true }, () => {
-                if (chrome.runtime.lastError) {
-                    console.error('Uninstall error:', chrome.runtime.lastError);
-                } else {
-                    console.log('Mod uninstalled successfully');
-                    window.close(); // Close popup after uninstall
-                }
-            });
-        };
-
-        buttonContainer.appendChild(uninstallBtn);
-        modMessage.appendChild(buttonContainer);
-    }
     // Auto-clear timer for enabled message (for when "Open mods tab" is OFF)
 
     let enabledAutoClearTimerId = null;
@@ -690,12 +577,37 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
 
-    // Unified message function
     // Global timers
     let autoClearTimerId = null;
     let redirectTimeoutId = null;
     let redirectIntervalId = null;
+    /**
+     * Displays a simple loading or status message in the UI.
+     * @param {string} message The text to display.
+     */
+    function showLoadingMessage(message) {
+        // This function likely exists in your code, based on showModMessage
+        const { enabledArea, redirectArea } = ensureMessageAreas();
 
+        // Clear any previous messages or buttons
+        enabledArea.innerHTML = '';
+        redirectArea.innerHTML = '';
+
+        const messageContainer = document.createElement('div');
+        messageContainer.id = 'modMessage';
+        messageContainer.style.textAlign = 'center';
+
+        const messageText = document.createElement('div');
+        // Using a standard text color for a neutral message
+        messageText.style.color = 'var(--text-color)';
+        messageText.textContent = message;
+
+        messageContainer.appendChild(messageText);
+        enabledArea.appendChild(messageContainer);
+
+        // This function also seems to exist in your code
+        ensureTempSeparator();
+    }
 // Unified message function
     async function showModMessage(mod, uninstallAndReinstall) {
         const { enabledArea, redirectArea } = ensureMessageAreas();
@@ -734,44 +646,73 @@ document.addEventListener('DOMContentLoaded', () => {
         ensureTempSeparator();
     }
 
+    /**
+     * Handles the main "Randomize" button click.
+     * Depending on user settings, it either just navigates to a mod
+     * or initiates an uninstall and opens the reinstall page.
+     */
+    /**
+     * This is the main function that should be tied to your "Randomize" button's click event.
+     */
+// This should be your main "Randomize" button's click handler
     async function onRandomizeClick() {
         try {
+
+
+            // 1. Get the latest uninstall setting
             const st = await chrome.storage.local.get('uninstallAndReinstallChecked');
             const uninstallAndReinstall = !!st.uninstallAndReinstallChecked;
 
-            const result = await chrome.runtime.sendMessage({
-                action: 'randomizeMods',
-                uninstallAndReinstall
+            // 2. Send a DIRECT message and AWAIT the background script's response
+            const modToProcess = await chrome.runtime.sendMessage({
+                action: 'getRandomMod', // We'll create this new action
+                uninstallAndReinstall: uninstallAndReinstall
             });
 
-            if (!result) {
-                showError('No mod returned from background');
+            // 3. Handle if no mod was found
+            if (!modToProcess || !modToProcess.id) {
+                showError('No mod was found to randomize.');
                 return;
             }
 
-            // Show message with mod name
-            await showModMessage(result, uninstallAndReinstall);
+            console.log('Received mod from background, proceeding with actions:', modToProcess.name);
 
-            // Redirect safely after 1.5s
-            const fallbackUrl = 'https://store.gx.me/mods/';
-            setTimeout(() => {
-                if (uninstallAndReinstall && result.reinstallUrl) {
-                    window.location.href = result.reinstallUrl;
-                } else if (!uninstallAndReinstall && result.modsTabUrl && !result.modsTabUrl.startsWith('chrome://')) {
-                    window.location.href = result.modsTabUrl;
-                } else {
-                    window.location.href = fallbackUrl;
-                }
-            }, 1500);
+            // 4. Perform actions IMMEDIATELY after getting the response
+            if (uninstallAndReinstall && modToProcess.reinstallUrl) {
+                await showModMessage(modToProcess, true);
 
-        } catch (err) {
-            console.error('Error randomizing mods:', err);
-            showError('Error randomizing mods. See console.');
+                // Open the tab first to preserve the user gesture
+                chrome.tabs.create({ url: modToProcess.reinstallUrl });
+
+                // Now trigger the uninstall confirmation dialog
+                chrome.management.uninstall(modToProcess.id, { showConfirmDialog: true }, () => {
+                    if (chrome.runtime.lastError) {
+                        console.log('Uninstall was cancelled by the user.');
+                    } else {
+                        console.log('Mod uninstalled successfully, closing popup.');
+                        window.close(); // Close the popup on success
+                    }
+                });
+            } else  {
+                await showModMessage(modToProcess, false);
+
+                // show the existing redirect animation
+                showRedirectMessage();
+
+                // then trigger redirect safely
+                setTimeout(() => {
+                    removeRedirectMessage();
+                    chrome.tabs.create({ url: 'opera://configure/mods/manage' });
+                    window.close(); // close the popup safely
+                }, 3000);
+            }
+
+
+        } catch (error) {
+            console.error('Error in randomization flow:', error);
+            showError(error.message || 'An unknown error occurred.');
         }
-    }
-
-
-// Helper for HTML escaping
+    }// Helper for HTML escaping
     function escapeHtml(s) {
         return (s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     }

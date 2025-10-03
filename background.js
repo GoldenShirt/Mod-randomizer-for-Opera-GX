@@ -234,14 +234,13 @@ async function addDetectedModsToAllProfiles(autoIdentify /* randomizeAllMods */)
 }
 // ---------- Randomization ----------
 // ---------------------- handleModEnableWorkflow ----------------------
-async function handleModEnableWorkflow(modIdsForRandomization, uninstallAndReinstall) {
+async function handleModEnableWorkflow(modIdsForRandomization, uninstallAndReinstall, source) {
     console.log(`[handleModEnableWorkflow] Starting workflow. Mods:`, modIdsForRandomization, `uninstallAndReinstall:`, uninstallAndReinstall);
 
     if (!modIdsForRandomization || modIdsForRandomization.length === 0) {
         console.warn('[handleModEnableWorkflow] No mods to randomize');
         return null;
     }
-
     const s = await storage.get(['lastEnabledModId']);
     const lastEnabled = s.lastEnabledModId;
     const all = await management.getAll();
@@ -263,14 +262,14 @@ async function handleModEnableWorkflow(modIdsForRandomization, uninstallAndReins
     const selected = candidates[Math.floor(Math.random() * candidates.length)];
     console.log(`[handleModEnableWorkflow] Selected mod: ${selected.name} (id: ${selected.id})`);
 
-    if (uninstallAndReinstall) {
+    if (uninstallAndReinstall && (source == "manual")) {
         // Uninstall and reinstall flow
         const reinstallUrl = await getModUrlByName(selected.name);
         console.log(`[handleModEnableWorkflow] Sending uninstall request to popup for mod: ${selected.name}`);
         await storage.set({ lastEnabledModId: selected.id, currentMod: selected.name });
         return { id: selected.id, name: selected.name, reinstallUrl, uninstallViaPopup: true };
-    } else {
-        // Enable flow (old logic)
+    } else if (source == "manual"){
+        // Enable flow (old logic) when uninstall is off
         await management.setEnabled(selected.id, true);
         await storage.set({ lastEnabledModId: selected.id, currentMod: selected.name });
         console.log(`[handleModEnableWorkflow] Enabled mod: ${selected.name}`);
@@ -282,6 +281,21 @@ async function handleModEnableWorkflow(modIdsForRandomization, uninstallAndReins
             modsTabUrl: 'opera://configure/mods/manage'
         };
     }
+    else {
+        await management.setEnabled(selected.id, true);
+        console.log(`[handleModEnableWorkflow] Enabled mod: ${selected.name}`);
+
+        // Store lastEnabledModId so the next run can pick it up
+        await storage.set({ lastEnabledModId: selected.id, currentMod: selected.name });
+
+        // Open mods management tab
+        chrome.tabs.create({ url: 'opera://configure/mods/manage' });
+
+        // Return null because the actual enable/uninstall must be handled by the user
+        return null;
+    }
+
+
 }// ---------------------- executeRandomization ----------------------
 async function executeRandomization(source = 'unknown', redirectDelayMs = 3000) {
     console.log(`[executeRandomization] Source: ${source}`);
@@ -291,7 +305,7 @@ async function executeRandomization(source = 'unknown', redirectDelayMs = 3000) 
         const useAll = !!s.autoModIdentificationChecked;
         const activeList = useAll ? detectedModList.map(m => m.id) : (s.profiles?.[s.activeProfile] || []);
 
-        const result = await handleModEnableWorkflow(activeList, s.uninstallAndReinstallChecked);
+        const result = await handleModEnableWorkflow(activeList, s.uninstallAndReinstallChecked, source);
 
         if (result) {
             const pending = { enabledExtension: result, timestamp: nowMs() };
@@ -348,7 +362,29 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
           console.log('Message: identifyModExtensions -> responded');
           break;
         }
+        //This handles the direct, synchronous request from the popup's button.
+          case 'getRandomMod': {
+              console.log('Message: getRandomMod received (direct from popup)');
 
+              // 1. Get the list of mods to choose from
+              const { detectedModList = [] } = await storage.get('detectedModList');
+              const { autoModIdentificationChecked } = await storage.get('autoModIdentificationChecked');
+              const { profiles = {}, activeProfile = 'Default' } = await storage.get(['profiles', 'activeProfile']);
+
+              const useAll = !!autoModIdentificationChecked;
+              const activeList = useAll ? detectedModList.map(m => m.id) : (profiles?.[activeProfile] || []);
+
+              // 2. Call your core logic function directly
+              const result = await handleModEnableWorkflow(
+                  activeList,
+                  message.uninstallAndReinstall, // Use the value sent from the popup
+                  'manual' // The source is manual
+              );
+
+              // 3. Send the result directly back to the waiting popup
+              sendResponse(result);
+              break;
+          }
         case 'getExtensions': {
           // Return only detected mods (so popup shows only mods), plus profiles + activeProfile
           const { detectedModList = [] } = await storage.get('detectedModList');
