@@ -68,10 +68,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
-    function removeTempSeparator() {
-        const tempHr = document.getElementById('message-temp-hr');
-        if (tempHr) tempHr.remove();
-    }
 
 
     // --- Helpers for chrome APIs ---
@@ -480,34 +476,6 @@ document.addEventListener('DOMContentLoaded', () => {
         redirectArea.innerHTML = '';
     }
 
-    async function showRedirectPlaceholder() {
-        // Respect the "Open mods tab" toggle; if it's off, do not show the redirect message
-        const st = await storageGet('uninstallAndReinstallChecked');
-        const openModsEnabled = !!st.uninstallAndReinstallChecked;
-        if (!openModsEnabled) {
-            removeRedirectMessage();
-            return;
-        }
-
-        const { redirectArea } = ensureMessageAreas();
-        // clear any previous placeholder
-        removeRedirectMessage();
-
-        const placeholder = document.createElement('p');
-        placeholder.className = 'redirect-message';
-        placeholder.textContent = 'Redirecting to enable checkmarks';
-        let dots = '';
-        const interval = setInterval(() => {
-            dots = dots.length < 3 ? dots + '.' : '';
-            placeholder.textContent = 'Redirecting to enable checkmarks' + dots;
-        }, 300);
-        placeholder.dataset.intervalId = String(interval);
-
-        redirectArea.appendChild(placeholder);
-
-        // Add a temporary hr between messages and manual section while redirect is pending
-        ensureTempSeparator();
-    }
     // Auto-clear timer for enabled message (for when "Open mods tab" is OFF)
 
     let enabledAutoClearTimerId = null;
@@ -585,29 +553,6 @@ document.addEventListener('DOMContentLoaded', () => {
      * Displays a simple loading or status message in the UI.
      * @param {string} message The text to display.
      */
-    function showLoadingMessage(message) {
-        // This function likely exists in your code, based on showModMessage
-        const { enabledArea, redirectArea } = ensureMessageAreas();
-
-        // Clear any previous messages or buttons
-        enabledArea.innerHTML = '';
-        redirectArea.innerHTML = '';
-
-        const messageContainer = document.createElement('div');
-        messageContainer.id = 'modMessage';
-        messageContainer.style.textAlign = 'center';
-
-        const messageText = document.createElement('div');
-        // Using a standard text color for a neutral message
-        messageText.style.color = 'var(--text-color)';
-        messageText.textContent = message;
-
-        messageContainer.appendChild(messageText);
-        enabledArea.appendChild(messageContainer);
-
-        // This function also seems to exist in your code
-        ensureTempSeparator();
-    }
 // Unified message function
     async function showModMessage(mod, uninstallAndReinstall) {
         const { enabledArea, redirectArea } = ensureMessageAreas();
@@ -634,6 +579,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const name = mod.name ? escapeHtml(mod.name) : '(unknown)';
             messageText.innerHTML = `URL missing- Enabled: <span class="mod-name">${name}</span>`;
         } else {
+            console.log("Url is "+ mod.reinstallUrl) ;
             const label = uninstallAndReinstall ? 'Chose Mod' : 'Enabled Mod';
             const name = mod.name ? escapeHtml(mod.name) : '(unknown)';
             messageText.innerHTML = `${label}: <span class="mod-name">${name}</span>`;
@@ -671,7 +617,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // 3. Handle if no mod was found
             if (!modToProcess || !modToProcess.id) {
-                showError('No mod was found to randomize.');
+                alert('No mod was found to randomize.');
                 return;
             }
 
@@ -693,18 +639,22 @@ document.addEventListener('DOMContentLoaded', () => {
                         window.close(); // Close the popup on success
                     }
                 });
-            } else  {
-                await showModMessage(modToProcess, false);
+            } else {
 
+                if (!uninstallAndReinstall) await showModMessage(modToProcess, false);
+                else {
+                    await showModMessage(modToProcess, true);
+                }
                 // show the existing redirect animation
                 showRedirectMessage();
 
                 // then trigger redirect safely
                 setTimeout(() => {
                     removeRedirectMessage();
-                    chrome.tabs.create({ url: 'opera://configure/mods/manage' });
+                    chrome.tabs.create({url: 'opera://configure/mods/manage'});
                     window.close(); // close the popup safely
-                }, 3000);
+                }, 90000);
+
             }
 
 

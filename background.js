@@ -149,7 +149,6 @@ async function loadCatalog() {
 }
 
 // Function to get a mod URL by name
-// Function to get a mod URL by name
 // ---------------------- getModUrlByName ----------------------
 async function getModUrlByName(modName) {
     console.log(`[getModUrlByName] Looking for URL of mod: "${modName}"`);
@@ -265,9 +264,27 @@ async function handleModEnableWorkflow(modIdsForRandomization, uninstallAndReins
     if (uninstallAndReinstall && (source == "manual")) {
         // Uninstall and reinstall flow
         const reinstallUrl = await getModUrlByName(selected.name);
-        console.log(`[handleModEnableWorkflow] Sending uninstall request to popup for mod: ${selected.name}`);
-        await storage.set({ lastEnabledModId: selected.id, currentMod: selected.name });
-        return { id: selected.id, name: selected.name, reinstallUrl, uninstallViaPopup: true };
+        if (!reinstallUrl) {
+            console.log('[handleModEnableWorkflow] Reinstall url is null, enabling instead')
+            // Enable flow (old logic) when uninstall is off
+            await management.setEnabled(selected.id, true);
+            await storage.set({ lastEnabledModId: selected.id, currentMod: selected.name });
+            console.log(`[handleModEnableWorkflow] Enabled mod: ${selected.name}`);
+
+            // Return with modsTabUrl for redirect, and null reinstallUrl
+            return {
+                id: selected.id,
+                name: selected.name,
+                modsTabUrl: 'opera://configure/mods/manage',
+                reinstallUrl: reinstallUrl || null, // explicitly send null if missing
+                uninstallViaPopup: false
+            };
+
+        }
+            else {
+                   console.log(`[handleModEnableWorkflow] Sending uninstall request to popup for mod: ${selected.name}`);
+                   await storage.set({ lastEnabledModId: selected.id, currentMod: selected.name });
+              return { id: selected.id, name: selected.name, reinstallUrl, uninstallViaPopup: true };}
     } else if (source == "manual"){
         // Enable flow (old logic) when uninstall is off
         await management.setEnabled(selected.id, true);
