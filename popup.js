@@ -667,6 +667,81 @@ document.addEventListener('DOMContentLoaded', () => {
         return (s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     }
 
+    function showUninstallButton(mod) {
+        // Find the existing message container
+        const modMessage = document.getElementById('modMessage');
+        if (!modMessage) {
+            console.error('modMessage container not found');
+            return;
+        }
+
+        // Create button container for centering
+        const buttonContainer = document.createElement('div');
+        buttonContainer.style.textAlign = 'center';
+        buttonContainer.style.marginTop = '8px';
+
+        const uninstallBtn = document.createElement('button');
+        uninstallBtn.textContent = 'Uninstall & Go';
+        uninstallBtn.style.padding = '6px 12px';
+        uninstallBtn.style.cursor = 'pointer';
+        uninstallBtn.style.backgroundColor = 'var(--success)';
+        uninstallBtn.style.color = 'white';
+        uninstallBtn.style.border = 'none';
+        uninstallBtn.style.borderRadius = '4px';
+        uninstallBtn.style.fontSize = '13px';
+        uninstallBtn.style.whiteSpace = 'nowrap';
+
+        uninstallBtn.onclick = async () => {
+            try {
+                console.log('Manual uninstall button clicked for:', mod.id);
+
+                // Uninstall FIRST (this opens confirmation dialog and preserves user gesture)
+                console.log('Uninstalling mod:', mod.id);
+                await chrome.management.uninstall(mod.id);
+
+                // After successful uninstall, open the tab
+                // Note: This code may not run if uninstall closes the popup
+                // So we use a different approach below
+
+            } catch (err) {
+                console.error('Error in uninstall flow:', err);
+
+                // If uninstall was cancelled or failed, still try to open the tab
+                if (mod.reinstallUrl) {
+                    console.log('Opening tab after error:', mod.reinstallUrl);
+                    chrome.tabs.create({ url: mod.reinstallUrl });
+                }
+            }
+        };
+
+        // Alternative: Add the URL as data attribute and use background script
+        uninstallBtn.dataset.reinstallUrl = mod.reinstallUrl;
+        uninstallBtn.dataset.modId = mod.id;
+
+        // Better approach: Use chrome.management.uninstall with showConfirmDialog and then redirect
+        uninstallBtn.onclick = () => {
+            console.log('Manual uninstall button clicked for:', mod.id);
+
+            // Open the tab immediately on click (preserves gesture)
+            if (mod.reinstallUrl) {
+                chrome.tabs.create({ url: mod.reinstallUrl });
+            }
+
+            // Then uninstall (shows confirmation dialog)
+            chrome.management.uninstall(mod.id, { showConfirmDialog: true }, () => {
+                if (chrome.runtime.lastError) {
+                    console.error('Uninstall error:', chrome.runtime.lastError);
+                } else {
+                    console.log('Mod uninstalled successfully');
+                    window.close(); // Close popup after uninstall
+                }
+            });
+        };
+
+        buttonContainer.appendChild(uninstallBtn);
+        modMessage.appendChild(buttonContainer);
+    }
+
 // Basic error message
     function showError(text) {
         els.message.textContent = text;
