@@ -299,6 +299,31 @@ async function handleModEnableWorkflow(modIdsForRandomization, uninstallAndReins
         };
     } else if (uninstallAndReinstall && !(source == "manual")){
         //open popup and show uninstall button
+        const reinstallUrl = await getModUrlByName(selected.name);
+
+        if (!reinstallUrl) {
+            console.log('[handleModEnableWorkflow] No reinstall URL found, fallback to enable only.');
+            await management.setEnabled(selected.id, true);
+            await storage.set({ lastEnabledModId: selected.id, currentMod: selected.name });
+
+            return {
+                id: selected.id,
+                name: selected.name,
+                modsTabUrl: 'opera://configure/mods/manage',
+                reinstallUrl: null,
+                uninstallViaPopup: false
+            };
+        }
+
+        await storage.set({ lastEnabledModId: selected.id, currentMod: selected.name });
+
+        // Instead of uninstalling directly, request popup UI to show button
+        return {
+            id: selected.id,
+            name: selected.name,
+            reinstallUrl,
+            uninstallViaPopup: true
+        };
     }
     else {
         await management.setEnabled(selected.id, true);

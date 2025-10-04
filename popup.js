@@ -34,22 +34,20 @@ document.addEventListener('DOMContentLoaded', () => {
 // Global timers
 
 
-    // Keep this listener for any OTHER messages the port might be used for.
-    port.onMessage.addListener(async (msg) => {
+    port.onMessage.addListener((msg) => {
         if (!msg || !msg.action) return;
 
-        // The 'randomizationCompleted' logic is now handled by the onRandomizeClick function.
-        // We have removed that block from here to avoid conflicts and to correctly
-        // handle the user gesture. The listener will now ignore that message.
-
-        // We keep other message handlers if they exist.
-        if (msg.action === 'redirectingNow') {
-            removeRedirectMessage();
-            console.log('Popup received redirectingNow via port');
+        if (msg.action === 'randomizationCompleted') {
+            const mod = msg.enabledExtension;
+            if (mod.uninstallViaPopup) {
+                console.log('Popup showing uninstall button for:', mod);
+                showUninstallButton(mod);
+            } else {
+                // handle normal enable flow (existing code)
+            }
         }
-
-        // You can add other 'else if' blocks here for other actions.
     });
+
     // Track which profile the UI is currently rendering/working with to avoid saving to a wrong profile on quick switches
     let currentProfile = null;
     let renderLock = false; // prevents mid-save re-renders that can drop fast clicks
