@@ -280,11 +280,11 @@ async function handleModEnableWorkflow(modIdsForRandomization, uninstallAndReins
                 uninstallViaPopup: false
             };
 
-        }
-            else {
+        } else {
                    console.log(`[handleModEnableWorkflow] Sending uninstall request to popup for mod: ${selected.name}`);
                    await storage.set({ lastEnabledModId: selected.id, currentMod: selected.name });
               return { id: selected.id, name: selected.name, reinstallUrl, uninstallViaPopup: true };}
+
     } else if (source == "manual"){
         // Enable flow (old logic) when uninstall is off
         await management.setEnabled(selected.id, true);
@@ -297,6 +297,8 @@ async function handleModEnableWorkflow(modIdsForRandomization, uninstallAndReins
             name: selected.name,
             modsTabUrl: 'opera://configure/mods/manage'
         };
+    } else if (uninstallAndReinstall && !(source == "manual")){
+        //open popup and show uninstall button
     }
     else {
         await management.setEnabled(selected.id, true);
@@ -312,8 +314,9 @@ async function handleModEnableWorkflow(modIdsForRandomization, uninstallAndReins
         return null;
     }
 
+}
 
-}// ---------------------- executeRandomization ----------------------
+// ---------------------- executeRandomization ----------------------
 async function executeRandomization(source = 'unknown', redirectDelayMs = 3000) {
     console.log(`[executeRandomization] Source: ${source}`);
     try {
