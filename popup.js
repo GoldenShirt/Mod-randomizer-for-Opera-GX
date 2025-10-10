@@ -6,10 +6,8 @@
 // - Disables manual list visually when auto-identify is ON
 // - Proper time conversion and display (no misleading "0")
 // - Logs actions to console for debugging
-// --- Port connection for robust messaging ---
 // THIS MUST BE AT THE TOP LEVEL (global scope)
 const port = chrome.runtime.connect({ name: 'popup' });
-
 document.addEventListener('DOMContentLoaded', () => {
     const els = {
         profileSelect: document.getElementById('profileSelect'),
@@ -28,41 +26,30 @@ document.addEventListener('DOMContentLoaded', () => {
         message: document.getElementById('message'),
     };
 
-    async function initPopupOnLoad() {
-        // If the popup page was opened with ?pending=<id>, read storage for the pending
-        const params = new URLSearchParams(location.search);
-        const pendingId = params.get('pending');
-
-        chrome.storage.local.get(['pendingRandomization'], (result) => {
-            const pending = result.pendingRandomization;
-            if (pending && pending.enabledExtension) {
-                // Optionally check pending timestamp / id match either pendingId or just show it
-                const mod = pending.enabledExtension;
-                console.log('popup loaded with pendingRandomization:', pending);
-                if (mod.uninstallViaPopup) {
-                    showUninstallButton(mod);
-                }
-            }
-        });
-    }
-
-    document.addEventListener('DOMContentLoaded', initPopupOnLoad);
 
 
-    port.onMessage.addListener((msg) => {
+    // --- Port connection for robust messaging ---
+
+
+// Global timers
+
+
+    // Keep this listener for any OTHER messages the port might be used for.
+    port.onMessage.addListener(async (msg) => {
         if (!msg || !msg.action) return;
 
-        if (msg.action === 'randomizationCompleted') {
-            const mod = msg.enabledExtension;
-            if (mod.uninstallViaPopup) {
-                console.log('Popup showing uninstall button for:', mod);
-                showUninstallButton(mod);
-            } else {
-                // handle normal enable flow (existing code)
-            }
-        }
-    });
+        // The 'randomizationCompleted' logic is now handled by the onRandomizeClick function.
+        // We have removed that block from here to avoid conflicts and to correctly
+        // handle the user gesture. The listener will now ignore that message.
 
+        // We keep other message handlers if they exist.
+        if (msg.action === 'redirectingNow') {
+            removeRedirectMessage();
+            console.log('Popup received redirectingNow via port');
+        }
+
+        // You can add other 'else if' blocks here for other actions.
+    });
     // Track which profile the UI is currently rendering/working with to avoid saving to a wrong profile on quick switches
     let currentProfile = null;
     let renderLock = false; // prevents mid-save re-renders that can drop fast clicks
@@ -678,58 +665,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }// Helper for HTML escaping
     function escapeHtml(s) {
         return (s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-    }
-
-    function showUninstallButton(mod) {
-        clearEnabledMessage();
-
-        // Show a header message with your custom UI
-        showModMessage(mod, true);
-
-        const { enabledArea } = ensureMessageAreas();
-        const buttonContainer = document.createElement('div');
-        buttonContainer.style.textAlign = 'center';
-        buttonContainer.style.marginTop = '8px';
-
-        const uninstallBtn = document.createElement('button');
-        uninstallBtn.textContent = 'Uninstall & Reinstall';
-        uninstallBtn.style.padding = '8px 14px';
-        uninstallBtn.style.cursor = 'pointer';
-        uninstallBtn.style.borderRadius = '6px';
-        uninstallBtn.style.border = 'none';
-        uninstallBtn.style.fontSize = '13px';
-        uninstallBtn.style.background = 'var(--button-bg, #444)';
-        uninstallBtn.style.color = '#fff';
-
-        uninstallBtn.onclick = () => {
-            console.log('Uninstall button clicked for', mod.id);
-
-            const doUninstall = () => {
-                chrome.management.uninstall(mod.id, { showConfirmDialog: true }, () => {
-                    if (chrome.runtime.lastError) {
-                        console.error('Uninstall error:', chrome.runtime.lastError);
-                        clearEnabledMessage();
-                        const errMsg = document.createElement('div');
-                        errMsg.style.color = 'var(--error, red)';
-                        errMsg.textContent = 'Uninstall cancelled or failed.';
-                        enabledArea.appendChild(errMsg);
-                    } else {
-                        console.log('Mod uninstalled successfully:', mod.id);
-                        chrome.storage.local.remove('pendingRandomization', () => {});
-                        window.close();
-                    }
-                });
-            };
-
-            if (mod.reinstallUrl) {
-                chrome.tabs.create({ url: mod.reinstallUrl }, () => doUninstall());
-            } else {
-                doUninstall();
-            }
-        };
-
-        buttonContainer.appendChild(uninstallBtn);
-        enabledArea.appendChild(buttonContainer);
     }
 
 // Basic error message

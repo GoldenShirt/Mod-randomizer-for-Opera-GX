@@ -45,21 +45,14 @@ async function tryDeliverToPopup(message) {
             popupPort = null;
         }
     }
-
-    return new Promise((resolve) => {
+    return new Promise(resolve => {
         chrome.runtime.sendMessage(message, (res) => {
             if (chrome.runtime.lastError) {
                 console.debug('runtime.sendMessage fallback failed', chrome.runtime.lastError.message);
                 resolve(false);
             } else {
-                // If no response, it's likely popup not listening
-                const consumed = res !== undefined;
-                if (!consumed) {
-                    console.debug('runtime.sendMessage fallback: no response from popup');
-                } else {
-                    console.log('runtime.sendMessage fallback delivered:', message.action);
-                }
-                resolve(consumed);
+                console.log('runtime.sendMessage fallback returned, may not be consumed');
+                resolve(true);
             }
         });
     });
@@ -247,7 +240,6 @@ async function handleModEnableWorkflow(modIdsForRandomization, uninstallAndReins
         console.warn('[handleModEnableWorkflow] No mods to randomize');
         return null;
     }
-
     const s = await storage.get(['lastEnabledModId']);
     const lastEnabled = s.lastEnabledModId;
     const all = await management.getAll();
@@ -269,70 +261,59 @@ async function handleModEnableWorkflow(modIdsForRandomization, uninstallAndReins
     const selected = candidates[Math.floor(Math.random() * candidates.length)];
     console.log(`[handleModEnableWorkflow] Selected mod: ${selected.name} (id: ${selected.id})`);
 
-    const reinstallUrl = uninstallAndReinstall ? await getModUrlByName(selected.name) : null;
-
-    await storage.set({ lastEnabledModId: selected.id, currentMod: selected.name });
-
-    if (uninstallAndReinstall && source !== "manual") {
+    if (uninstallAndReinstall && (source == "manual")) {
+        // Uninstall and reinstall flow
+        const reinstallUrl = await getModUrlByName(selected.name);
         if (!reinstallUrl) {
-            console.log('[handleModEnableWorkflow] No reinstall URL found, fallback to enable only.');
+            console.log('[handleModEnableWorkflow] Reinstall url is null, enabling instead')
+            // Enable flow (old logic) when uninstall is off
             await management.setEnabled(selected.id, true);
+            await storage.set({ lastEnabledModId: selected.id, currentMod: selected.name });
+            console.log(`[handleModEnableWorkflow] Enabled mod: ${selected.name}`);
 
+            // Return with modsTabUrl for redirect, and null reinstallUrl
             return {
                 id: selected.id,
                 name: selected.name,
                 modsTabUrl: 'opera://configure/mods/manage',
-                reinstallUrl: null,
+                reinstallUrl: reinstallUrl || null, // explicitly send null if missing
                 uninstallViaPopup: false
             };
+
         }
+            else {
+                   console.log(`[handleModEnableWorkflow] Sending uninstall request to popup for mod: ${selected.name}`);
+                   await storage.set({ lastEnabledModId: selected.id, currentMod: selected.name });
+              return { id: selected.id, name: selected.name, reinstallUrl, uninstallViaPopup: true };}
+    } else if (source == "manual"){
+        // Enable flow (old logic) when uninstall is off
+        await management.setEnabled(selected.id, true);
+        await storage.set({ lastEnabledModId: selected.id, currentMod: selected.name });
+        console.log(`[handleModEnableWorkflow] Enabled mod: ${selected.name}`);
 
-        // Store pendingRandomization so popup knows what to show
-        await storage.set({
-            pendingRandomization: {
-                enabledExtension: { id: selected.id, name: selected.name, reinstallUrl, uninstallViaPopup: true },
-                timestamp: Date.now()
-            }
-        });
+        // Return with modsTabUrl for redirect
+        return {
+            id: selected.id,
+            name: selected.name,
+            modsTabUrl: 'opera://configure/mods/manage'
+        };
+    }
+    else {
+        await management.setEnabled(selected.id, true);
+        console.log(`[handleModEnableWorkflow] Enabled mod: ${selected.name}`);
 
-        // OPEN popup.html as a new tab for alarm-triggered workflow
-        chrome.tabs.create({ url: chrome.runtime.getURL('popup.html?pending=1') });
+        // Store lastEnabledModId so the next run can pick it up
+        await storage.set({ lastEnabledModId: selected.id, currentMod: selected.name });
 
-        console.log(`[handleModEnableWorkflow] Alarm triggered uninstall popup opened for: ${selected.name}`);
+        // Open mods management tab
+        chrome.tabs.create({ url: 'opera://configure/mods/manage' });
 
-        return { id: selected.id, name: selected.name, reinstallUrl, uninstallViaPopup: true };
+        // Return null because the actual enable/uninstall must be handled by the user
+        return null;
     }
 
-    // Manual flows
-    if (source === "manual") {
-        if (uninstallAndReinstall) {
-            if (!reinstallUrl) {
-                console.log('[handleModEnableWorkflow] Manual uninstall fallback to enable');
-                await management.setEnabled(selected.id, true);
-                return {
-                    id: selected.id,
-                    name: selected.name,
-                    modsTabUrl: 'opera://configure/mods/manage',
-                    reinstallUrl: null,
-                    uninstallViaPopup: false
-                };
-            }
-            return { id: selected.id, name: selected.name, reinstallUrl, uninstallViaPopup: true };
-        } else {
-            await management.setEnabled(selected.id, true);
-            console.log(`[handleModEnableWorkflow] Enabled mod: ${selected.name}`);
-            return { id: selected.id, name: selected.name, modsTabUrl: 'opera://configure/mods/manage' };
-        }
-    }
 
-    // Default enable + redirect
-    await management.setEnabled(selected.id, true);
-    console.log(`[handleModEnableWorkflow] Enabled mod: ${selected.name}`);
-    chrome.tabs.create({ url: 'opera://configure/mods/manage' });
-    return null;
-}
-
-// ---------------------- executeRandomization ----------------------
+}// ---------------------- executeRandomization ----------------------
 async function executeRandomization(source = 'unknown', redirectDelayMs = 3000) {
     console.log(`[executeRandomization] Source: ${source}`);
     try {
