@@ -24,7 +24,10 @@ document.addEventListener('DOMContentLoaded', () => {
         searchBar: document.getElementById('searchBar'),
         currentMod: document.getElementById('current-mod'),
         message: document.getElementById('message'),
-    };
+        toggleAllBtn: document.getElementById('toggleAllBtn'),
+        reverseAllBtn: document.getElementById('reverseAllBtn')
+
+};
 
 
 
@@ -390,6 +393,7 @@ document.addEventListener('DOMContentLoaded', () => {
             li.appendChild(label);
             els.extensionList.appendChild(li);
         }
+
 
         console.log(`Rendered manual list for profile ${active} entries ${sortedOrder.length} (detected=${detected.length}, randomizeAll=${randomizeAll})`);
     }
@@ -825,12 +829,52 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Event wiring ---
     els.searchBar.addEventListener('input', onSearchInput);
 
+
     els.randomizeButton.addEventListener('click', onRandomizeClick);
 
     els.autoModToggle.addEventListener('change', () => onToggleChange('autoModIdentificationChecked', els.autoModToggle));
     els.openModsToggle.addEventListener('change', () => onToggleChange('uninstallAndReinstallChecked', els.openModsToggle));
     els.startupToggle.addEventListener('change', () => onToggleChange('toggleRandomizeOnStartupChecked', els.startupToggle));
     els.setTimeToggle.addEventListener('change', () => onToggleChange('toggleRandomizeOnSetTimeChecked', els.setTimeToggle));
+// --- Toggle All Mods Button ---
+    if (els.toggleAllBtn) {
+        els.toggleAllBtn.addEventListener('click', async () => {
+            // Don’t run if randomize-all is ON or list disabled
+            if (els.extensionList.classList.contains('disabled')) return;
+
+            const checkboxes = els.extensionList.querySelectorAll('input[type="checkbox"]');
+            if (!checkboxes.length) return;
+
+            // Determine whether to enable or disable all based on current majority state
+            const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+            const newState = !allChecked;
+
+            checkboxes.forEach(cb => {
+                cb.checked = newState;
+            });
+
+            console.log(`ToggleAllMods -> setting all to ${newState ? 'checked' : 'unchecked'}`);
+            await onManualCheckboxChange(); // reuse your existing debounced save
+        });
+    }
+    // --- Reverse All Mods Button ---
+    if (els.reverseAllBtn) {
+        els.reverseAllBtn.addEventListener('click', async () => {
+            // Don't allow changes when randomize-all is ON
+            if (els.extensionList.classList.contains('disabled')) return;
+
+            const checkboxes = els.extensionList.querySelectorAll('input[type="checkbox"]');
+            if (!checkboxes.length) return;
+
+            checkboxes.forEach(cb => {
+                cb.checked = !cb.checked; // flip each checkbox
+            });
+
+            console.log('ReverseAllMods -> flipped all mod states');
+            await onManualCheckboxChange(); // reuse your existing debounce/save
+        });
+    }
+
 
     // Guard these in case the inputs are not present in this build/variant
     if (els.timeInput) {
