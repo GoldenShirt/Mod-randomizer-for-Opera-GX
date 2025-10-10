@@ -194,24 +194,27 @@ input:checked + .slider:before {
     box-shadow: 0 0 6px var(--accent);
     cursor: pointer;
 }
+
+/* --- Buttons directly below search --- */
 .toggle-row {
     display: flex;
     justify-content: space-between;
-    gap: 0.5rem;
-    margin: 0.4rem 0 0.6rem 0;
+    gap: 0.15rem; /* reduced horizontal space between buttons */
+    margin-top: 0.05rem;
+    padding: 0 0.25rem;
 }
 
 #toggleAllBtn,
 #reverseAllBtn {
     flex: 1;
-    padding: 0.5rem 0;
+    padding: 0.6rem 0;
     font-size: 0.95rem;
     border: 1px solid var(--border);
     border-radius: 6px;
-    background-color: var(--bg-alt);
+    background-color: var(--bg-input);
     color: var(--text);
     cursor: pointer;
-    transition: background 0.2s, border-color 0.2s, transform 0.1s;
+    transition: background-color 0.2s, color 0.2s, border-color 0.2s;
 }
 
 #toggleAllBtn:hover,
@@ -219,8 +222,8 @@ input:checked + .slider:before {
     background-color: var(--accent);
     color: var(--accent-contrast);
     border-color: var(--accent);
-    transform: scale(1.02);
 }
+
 
 
 /* Slight inner-left gap for the time input */
@@ -373,7 +376,7 @@ input:checked + .slider:before {
 }
 
 #searchBar {
-  padding-left: 0.8rem; /* subtle extra inset */
+    padding-left: 0.8rem; /* subtle extra inset */
     width: 95%;
     font-size:1rem;
     max-width: 100%;
