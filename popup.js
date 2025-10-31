@@ -473,11 +473,34 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function removeRedirectMessage() {
-        const { redirectArea } = ensureMessageAreas();
-        // Stop any running animation timer
-        const el = redirectArea.querySelector('.redirect-message');
-        if (el?.dataset.intervalId) clearInterval(parseInt(el.dataset.intervalId));
-        redirectArea.innerHTML = '';
+        const redirectArea = document.getElementById('redirect-area');
+        if (redirectArea) {
+            // Stop any running animation timer
+            const el = redirectArea.querySelector('.redirect-message');
+            if (el?.dataset.intervalId) clearInterval(parseInt(el.dataset.intervalId));
+            redirectArea.innerHTML = '';
+        }
+        // Remove message-hr and areas if both are empty
+        removeMessageAreasIfEmpty();
+    }
+
+    function removeMessageAreasIfEmpty() {
+        const enabledArea = document.getElementById('enabled-area');
+        const redirectArea = document.getElementById('redirect-area');
+        const permanentHr = document.getElementById('message-hr');
+        const tempHr = document.getElementById('message-temp-hr');
+
+        // Check if both areas are empty
+        const enabledEmpty = !enabledArea || enabledArea.childElementCount === 0;
+        const redirectEmpty = !redirectArea || redirectArea.childElementCount === 0;
+
+        if (enabledEmpty && redirectEmpty) {
+            // Remove all message-related elements
+            if (enabledArea) enabledArea.remove();
+            if (redirectArea) redirectArea.remove();
+            if (permanentHr) permanentHr.remove();
+            if (tempHr) tempHr.remove();
+        }
     }
 
     // Auto-clear timer for enabled message (for when "Open mods tab" is OFF)
@@ -544,8 +567,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     function clearEnabledMessage() {
-        const { enabledArea } = ensureMessageAreas();
-        enabledArea.innerHTML = '';
+        const enabledArea = document.getElementById('enabled-area');
+        if (enabledArea) {
+            enabledArea.innerHTML = '';
+        }
+        // Remove message-hr and areas if both are empty
+        removeMessageAreasIfEmpty();
     }
 
 
@@ -929,8 +956,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Prevent default submit behavior
         document.getElementById('modForm')?.addEventListener('submit', e => e.preventDefault());
 
-        // Stabilize areas on open; leave the permanent hr as-is
-        ensureMessageAreas();
+        // Clean up any leftover message areas on open
         clearEnabledMessage();
         removeRedirectMessage();
         // Ensure randomize-all defaults to ON on first run

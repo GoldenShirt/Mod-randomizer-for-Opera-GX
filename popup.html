@@ -25,18 +25,13 @@
             </div>
         </fieldset>
 
+        <!-- Randomize Button -->
+        <button id="randomizeButton" type="button">🎲 Randomize</button>
+
         <!-- Automatic Controls -->
         <fieldset class="auto-section">
             <legend>Settings</legend>
             <div class="option-container">
-                <label class="switch-label">
-                    <span>Randomize all mods (ignores profiles)</span>
-                    <label class="switch">
-                        <input type="checkbox" id="randomizeAllMods">
-                        <span class="slider"></span>
-                    </label>
-                </label>
-
                 <label class="switch-label">
                     <span>Uninstall and reinstall</span>
                     <label class="switch">
@@ -74,6 +69,14 @@
                 <details class="advanced-settings">
                     <summary>Advanced Settings</summary>
                     <div class="advanced-content">
+                        <label class="switch-label">
+                            <span>Randomize all mods (ignores profiles)</span>
+                            <label class="switch">
+                                <input type="checkbox" id="randomizeAllMods">
+                                <span class="slider"></span>
+                            </label>
+                        </label>
+
                         <div class="two-column-switches">
                             <label class="switch-label">
                                 <span>Open mods tab</span>
@@ -95,10 +98,6 @@
                 </details>
             </div>
         </fieldset>
-
-        <!-- Randomize Button -->
-        <button id="randomizeButton" type="button">🎲 Randomize</button>
-        <hr id="message-hr" />
 
         <!-- Manual Controls -->
         <fieldset class="manual-section">
