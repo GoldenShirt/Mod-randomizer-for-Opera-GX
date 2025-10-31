@@ -959,11 +959,11 @@ document.addEventListener('DOMContentLoaded', () => {
         // Clean up any leftover message areas on open
         clearEnabledMessage();
         removeRedirectMessage();
-        // Ensure randomize-all defaults to ON on first run
+        // Ensure randomize-all defaults to OFF on first run
         const sInitial = await storageGet('autoModIdentificationChecked');
         if (sInitial.autoModIdentificationChecked === undefined) {
-            await storageSet({ autoModIdentificationChecked: true });
-            if (els.autoModToggle) els.autoModToggle.checked = true;
+            await storageSet({ autoModIdentificationChecked: false });
+            if (els.autoModToggle) els.autoModToggle.checked = false;
         }
 
         // Remove double identification: rely on popupOpened to do it once
@@ -985,8 +985,8 @@ document.addEventListener('DOMContentLoaded', () => {
             'currentMod'
         ]);
 
-        // Default randomize-all to true if missing
-        const randomizeAll = s.autoModIdentificationChecked === undefined ? true : !!s.autoModIdentificationChecked;
+        // Default randomize-all to false if missing
+        const randomizeAll = s.autoModIdentificationChecked === undefined ? false : !!s.autoModIdentificationChecked;
 
         if (els.autoModToggle) els.autoModToggle.checked = randomizeAll;
         els.openModsToggle.checked = s.uninstallAndReinstallChecked === undefined ? true : !!s.uninstallAndReinstallChecked;

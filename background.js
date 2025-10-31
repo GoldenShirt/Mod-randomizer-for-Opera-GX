@@ -759,8 +759,8 @@ chrome.alarms.onAlarm.addListener(async alarm => {
 chrome.runtime.onStartup.addListener(async () => {
   const s = await storage.get(['toggleRandomizeOnStartupChecked', 'autoModIdentificationChecked']);
   if (s.autoModIdentificationChecked === undefined) {
-    await storage.set({ autoModIdentificationChecked: true });
-    console.log('Startup: randomize-all missing; set to ON by default');
+    await storage.set({ autoModIdentificationChecked: false });
+    console.log('Startup: randomize-all missing; set to OFF by default');
   }
   if (s.toggleRandomizeOnStartupChecked) {
     console.log('onStartup -> toggleRandomizeOnStartupChecked true; scheduling startup randomize');
@@ -773,7 +773,7 @@ chrome.runtime.onInstalled.addListener(async details => {
     // Initialize sensible defaults
     await storage.set({
       toggleRandomizeOnStartupChecked: false,
-      autoModIdentificationChecked: true, // randomize-all: ON by default
+      autoModIdentificationChecked: false, // randomize-all: OFF by default
       uninstallAndReinstallChecked: true,
       openModsTabChecked: true, // open mods tab: ON by default
       showNotificationsChecked: true, // show notifications: ON by default
@@ -781,16 +781,16 @@ chrome.runtime.onInstalled.addListener(async details => {
       randomizeTime: 0,
       currentMod: 'None'
     });
-    console.log('Installed: default settings saved (randomize-all ON)');
+    console.log('Installed: default settings saved (randomize-all OFF)');
     await identifyModExtensions();
     await ensureDefaults();
   } else if (details.reason === 'update') {
     console.log('Extension updated');
-    // Migration: if key is missing, default to true
+    // Migration: if key is missing, default appropriately
     const s = await storage.get(['autoModIdentificationChecked', 'openModsTabChecked', 'showNotificationsChecked']);
     const updates = {};
     if (s.autoModIdentificationChecked === undefined) {
-      updates.autoModIdentificationChecked = true;
+      updates.autoModIdentificationChecked = false;
     }
     if (s.openModsTabChecked === undefined) {
       updates.openModsTabChecked = true;
