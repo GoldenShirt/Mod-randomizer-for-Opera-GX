@@ -154,22 +154,22 @@ async function getModUrlByName(modName) {
     console.log(`[getModUrlByName] Looking for URL of mod: "${modName}"`);
 
     // Check catalog first
-    if (catalog[modName]) {
+    if (catalog[modName] && catalog[modName].url) {
         console.log(`[getModUrlByName] Found in catalog:`, catalog[modName].url);
         return catalog[modName].url;
     } else {
-        console.log(`[getModUrlByName] Not found in catalog`);
+        console.log(`[getModUrlByName] Not found in catalog for name: "${modName}"`);
     }
 
     // Check newly installed mods
     const storageData = await chrome.storage.local.get(['newMods']);
     const newMods = storageData.newMods || {};
     const found = Object.values(newMods).find(m => m.name === modName);
-    if (found) {
+    if (found && found.url) {
         console.log(`[getModUrlByName] Found in newMods storage:`, found.url);
         return found.url;
     } else {
-        console.log(`[getModUrlByName] Not found in newMods storage`);
+        console.log(`[getModUrlByName] Not found in newMods storage for: "${modName}"`);
     }
 
     // Fallback
@@ -261,55 +261,44 @@ async function handleModEnableWorkflow(modIdsForRandomization, uninstallAndReins
     const selected = candidates[Math.floor(Math.random() * candidates.length)];
     console.log(`[handleModEnableWorkflow] Selected mod: ${selected.name} (id: ${selected.id})`);
 
-    if (uninstallAndReinstall && (source == "manual")) {
-        // Uninstall and reinstall flow
+    // This function now only handles MANUAL randomization (alarm/startup handled separately)
+    if (source !== "manual") {
+        console.warn('[handleModEnableWorkflow] Called with non-manual source - this should not happen');
+        return null;
+    }
+
+    if (uninstallAndReinstall) {
+        // MANUAL + UNINSTALL MODE
         const reinstallUrl = await getModUrlByName(selected.name);
         if (!reinstallUrl) {
             console.log('[handleModEnableWorkflow] Reinstall url is null, enabling instead')
-            // Enable flow (old logic) when uninstall is off
+            // Fallback: Enable and redirect to mods tab
             await management.setEnabled(selected.id, true);
             await storage.set({ lastEnabledModId: selected.id, currentMod: selected.name });
             console.log(`[handleModEnableWorkflow] Enabled mod: ${selected.name}`);
 
-            // Return with modsTabUrl for redirect, and null reinstallUrl
             return {
                 id: selected.id,
                 name: selected.name,
                 modsTabUrl: 'opera://configure/mods/manage',
-                reinstallUrl: reinstallUrl || null, // explicitly send null if missing
-                uninstallViaPopup: false
+                reinstallUrl: null
             };
-
+        } else {
+            console.log(`[handleModEnableWorkflow] Sending uninstall request to popup for mod: ${selected.name}`);
+            await storage.set({ lastEnabledModId: selected.id, currentMod: selected.name });
+            return { id: selected.id, name: selected.name, reinstallUrl };
         }
-            else {
-                   console.log(`[handleModEnableWorkflow] Sending uninstall request to popup for mod: ${selected.name}`);
-                   await storage.set({ lastEnabledModId: selected.id, currentMod: selected.name });
-              return { id: selected.id, name: selected.name, reinstallUrl, uninstallViaPopup: true };}
-    } else if (source == "manual"){
-        // Enable flow (old logic) when uninstall is off
+    } else {
+        // MANUAL + ENABLE MODE
         await management.setEnabled(selected.id, true);
         await storage.set({ lastEnabledModId: selected.id, currentMod: selected.name });
         console.log(`[handleModEnableWorkflow] Enabled mod: ${selected.name}`);
 
-        // Return with modsTabUrl for redirect
         return {
             id: selected.id,
             name: selected.name,
             modsTabUrl: 'opera://configure/mods/manage'
         };
-    }
-    else {
-        await management.setEnabled(selected.id, true);
-        console.log(`[handleModEnableWorkflow] Enabled mod: ${selected.name}`);
-
-        // Store lastEnabledModId so the next run can pick it up
-        await storage.set({ lastEnabledModId: selected.id, currentMod: selected.name });
-
-        // Open mods management tab
-        chrome.tabs.create({ url: 'opera://configure/mods/manage' });
-
-        // Return null because the actual enable/uninstall must be handled by the user
-        return null;
     }
 
 
@@ -322,12 +311,91 @@ async function executeRandomization(source = 'unknown', redirectDelayMs = 3000) 
         const useAll = !!s.autoModIdentificationChecked;
         const activeList = useAll ? detectedModList.map(m => m.id) : (s.profiles?.[s.activeProfile] || []);
 
+        // Special handling for auto randomization (alarm/startup)
+        if (source === 'alarm' || source === 'startup') {
+            const all = await management.getAll();
+            const mods = all.filter(e => activeList.includes(e.id));
+            const lastEnabled = (await storage.get('lastEnabledModId')).lastEnabledModId;
+            const candidates = mods.filter(m => m.id !== lastEnabled);
+
+            if (!candidates.length) return null;
+
+            const selected = candidates[Math.floor(Math.random() * candidates.length)];
+
+            // Delay before showing notification: 5s for startup, 0.5s for alarm
+            const notificationDelay = source === 'startup' ? 5000 : 500;
+
+            if (s.uninstallAndReinstallChecked) {
+                // UNINSTALL MODE: Disable mods first, then show notification after delay
+                const currentlyEnabled = mods.filter(m => m.enabled);
+                await Promise.all(currentlyEnabled.map(m => management.setEnabled(m.id, false)));
+
+                const reinstallUrl = await getModUrlByName(selected.name);
+
+                // Update storage before showing notification
+                await storage.set({
+                    lastEnabledModId: selected.id,
+                    currentMod: selected.name,
+                    pendingNotification: {
+                        modId: selected.id,
+                        modName: selected.name,
+                        reinstallUrl: reinstallUrl,
+                        uninstallMode: true,
+                        timestamp: nowMs()
+                    }
+                });
+
+                setTimeout(() => {
+                    chrome.notifications.create('modRandomizerAlert', {
+                        type: 'basic',
+                        iconUrl: 'icons/icon_128.png',
+                        title: 'Mod Randomizer',
+                        message: `Ready to switch to: ${selected.name}\n\nClick to uninstall and reinstall.`,
+                        requireInteraction: true
+                    });
+                    console.log(`Auto randomization (uninstall mode): notification created for ${selected.name}`);
+                }, notificationDelay);
+
+                return null;
+            } else {
+                // ENABLE MODE: Disable others, enable selected, show notification after delay, then redirect
+                const currentlyEnabled = mods.filter(m => m.enabled);
+                await Promise.all(currentlyEnabled.map(m => management.setEnabled(m.id, false)));
+                await management.setEnabled(selected.id, true);
+                await storage.set({ lastEnabledModId: selected.id, currentMod: selected.name });
+
+                console.log(`Auto randomization (enable mode): enabled ${selected.name}, showing notification after delay`);
+
+                setTimeout(() => {
+                    // Show notification explaining the redirect
+                    chrome.notifications.create('modRandomizerAlert', {
+                        type: 'basic',
+                        iconUrl: 'icons/icon_128.png',
+                        title: 'Mod Randomizer',
+                        message: `Enabled: ${selected.name}\n\nRedirecting to mods tab...`,
+                        requireInteraction: false
+                    });
+
+                    setTimeout(() => {
+                        chrome.tabs.create({ url: 'opera://configure/mods/manage' });
+                        chrome.notifications.clear('modRandomizerAlert');
+                    }, 3000);
+                }, notificationDelay);
+
+                return null;
+            }
+        }
+
+        // Only manual randomization reaches here (alarm/startup already returned)
         const result = await handleModEnableWorkflow(activeList, s.uninstallAndReinstallChecked, source);
 
         if (result) {
             const pending = { enabledExtension: result, timestamp: nowMs() };
             await storage.set({ pendingRandomization: pending });
-            tryDeliverToPopup({ action: 'randomizationCompleted', enabledExtension: result, pendingId: pending.timestamp });
+            // Only try to deliver if it's manual (popup is open)
+            if (source === 'manual') {
+                tryDeliverToPopup({ action: 'randomizationCompleted', enabledExtension: result, pendingId: pending.timestamp });
+            }
         }
 
         return result;
@@ -336,7 +404,51 @@ async function executeRandomization(source = 'unknown', redirectDelayMs = 3000) 
         return null;
     }
 }
+// Handle notification clicks - only for uninstall mode
+chrome.notifications.onClicked.addListener((notificationId) => {
+    if (notificationId === 'modRandomizerAlert') {
+        // Use callback-based storage to preserve user gesture synchronously
+        chrome.storage.local.get('pendingNotification', (result) => {
+            const pendingNotification = result.pendingNotification;
+            if (!pendingNotification) return;
 
+            // Only handle uninstall mode clicks (enable mode notification is informational only)
+            if (!pendingNotification.uninstallMode) {
+                console.log('Notification clicked but enable mode - no action needed');
+                return;
+            }
+
+            console.log(`Notification clicked for ${pendingNotification.modName} - triggering uninstall`);
+
+            // Clear notification immediately
+            chrome.notifications.clear(notificationId);
+
+            // Trigger uninstall IMMEDIATELY using this click event (user gesture) - MUST be synchronous
+            chrome.management.uninstall(pendingNotification.modId, { showConfirmDialog: true }, () => {
+                if (chrome.runtime.lastError) {
+                    console.log('Uninstall cancelled by user');
+                } else {
+                    console.log('Mod uninstalled successfully from notification');
+                }
+                // Clear storage after uninstall completes (whether cancelled or not)
+                chrome.storage.local.remove('pendingNotification');
+            });
+
+            // Redirect immediately (don't wait for uninstall to complete)
+            if (pendingNotification.reinstallUrl) {
+                chrome.tabs.create({ url: pendingNotification.reinstallUrl });
+            }
+        });
+    }
+});
+
+// Clean up on notification dismiss
+chrome.notifications.onClosed.addListener(async (notificationId) => {
+    if (notificationId === 'modRandomizerAlert') {
+        await storage.remove('pendingNotification');
+        console.log('Notification dismissed, cleared pending action');
+    }
+});
 // ---------- Alarms & Scheduling ----------
 async function setRandomizeTime(minutes) {
   const parsed = parseFloat(minutes);
@@ -471,10 +583,16 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
             if (randomizeTime > 0) {
               chrome.alarms.create('randomizeAlarm', { delayInMinutes: randomizeTime, periodInMinutes: randomizeTime });
               console.log('Scheduled randomizeAlarm because toggle enabled and randomizeTime > 0');
+            } else {
+              console.log('Toggle enabled but randomizeTime is 0, not scheduling alarm');
             }
           } else {
-            chrome.alarms.clear('randomizeAlarm');
-            console.log('Cleared randomizeAlarm because toggle disabled');
+            await new Promise(resolve => {
+              chrome.alarms.clear('randomizeAlarm', (wasCleared) => {
+                console.log(`Cleared randomizeAlarm because toggle disabled: ${wasCleared}`);
+                resolve();
+              });
+            });
           }
           sendResponse({ status: 'success' });
           break;

@@ -34,8 +34,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Port connection for robust messaging ---
 
 
-// Global timers
-
 
     // Keep this listener for any OTHER messages the port might be used for.
     port.onMessage.addListener(async (msg) => {
@@ -605,71 +603,63 @@ document.addEventListener('DOMContentLoaded', () => {
      * This is the main function that should be tied to your "Randomize" button's click event.
      */
 // This should be your main "Randomize" button's click handler
+// Modify onRandomizeClick:
     async function onRandomizeClick() {
         try {
+            // Cancel any existing redirect
+            if (redirectTimeoutId) {
+                clearTimeout(redirectTimeoutId);
+                redirectTimeoutId = null;
+                console.log('Cancelled previous redirect timer');
+            }
 
-
-            // 1. Get the latest uninstall setting
             const st = await chrome.storage.local.get('uninstallAndReinstallChecked');
             const uninstallAndReinstall = !!st.uninstallAndReinstallChecked;
 
-            // 2. Send a DIRECT message and AWAIT the background script's response
             const modToProcess = await chrome.runtime.sendMessage({
-                action: 'getRandomMod', // We'll create this new action
+                action: 'getRandomMod',
                 uninstallAndReinstall: uninstallAndReinstall
             });
 
-            // 3. Handle if no mod was found
             if (!modToProcess || !modToProcess.id) {
                 alert('No mod was found to randomize.');
                 return;
             }
 
-            console.log('Received mod from background, proceeding with actions:', modToProcess.name);
+            console.log('Received mod from background:', modToProcess.name);
 
-            // 4. Perform actions IMMEDIATELY after getting the response
             if (uninstallAndReinstall && modToProcess.reinstallUrl) {
                 await showModMessage(modToProcess, true);
-
-                // Open the tab first to preserve the user gesture
                 chrome.tabs.create({ url: modToProcess.reinstallUrl });
 
-                // Now trigger the uninstall confirmation dialog
                 chrome.management.uninstall(modToProcess.id, { showConfirmDialog: true }, () => {
                     if (chrome.runtime.lastError) {
-                        console.log('Uninstall was cancelled by the user.');
+                        console.log('Uninstall cancelled');
                     } else {
-                        console.log('Mod uninstalled successfully, closing popup.');
-                        window.close(); // Close the popup on success
+                        console.log('Mod uninstalled, closing popup');
+                        window.close();
                     }
                 });
             } else {
-
-                if (!uninstallAndReinstall) await showModMessage(modToProcess, false);
-                else {
-                    await showModMessage(modToProcess, true);
-                }
-                // show the existing redirect animation
+                await showModMessage(modToProcess, uninstallAndReinstall && !modToProcess.reinstallUrl);
                 showRedirectMessage();
 
-                // then trigger redirect safely
-                setTimeout(() => {
+                // Store timeout ID so it can be cancelled on next click
+                redirectTimeoutId = setTimeout(() => {
                     removeRedirectMessage();
-                    chrome.tabs.create({url: 'opera://configure/mods/manage'});
-                    window.close(); // close the popup safely
+                    chrome.tabs.create({ url: 'opera://configure/mods/manage' });
+                    window.close();
                 }, 3000);
-
             }
-
 
         } catch (error) {
             console.error('Error in randomization flow:', error);
             showError(error.message || 'An unknown error occurred.');
         }
-    }// Helper for HTML escaping
-    function escapeHtml(s) {
+    }    function escapeHtml(s) {
         return (s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     }
+
 
 // Basic error message
     function showError(text) {
@@ -932,7 +922,6 @@ document.addEventListener('DOMContentLoaded', () => {
         ensureMessageAreas();
         clearEnabledMessage();
         removeRedirectMessage();
-
         // Ensure randomize-all defaults to ON on first run
         const sInitial = await storageGet('autoModIdentificationChecked');
         if (sInitial.autoModIdentificationChecked === undefined) {
