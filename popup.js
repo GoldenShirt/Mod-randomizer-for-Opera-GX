@@ -15,6 +15,8 @@ document.addEventListener('DOMContentLoaded', () => {
         deleteProfileBtn: document.getElementById('deleteProfileBtn'),
         autoModToggle: document.getElementById('randomizeAllMods'),
         openModsToggle: document.getElementById('uninstallAndReinstall'),
+        openModsTabToggle: document.getElementById('openModsTab'),
+        showNotificationsToggle: document.getElementById('showNotifications'),
         startupToggle: document.getElementById('toggleRandomizeOnStartup'),
         setTimeToggle: document.getElementById('toggleRandomizeOnSetTime'),
         timeInput: document.getElementById('timeInput'),
@@ -642,14 +644,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             } else {
                 await showModMessage(modToProcess, uninstallAndReinstall && !modToProcess.reinstallUrl);
-                showRedirectMessage();
 
-                // Store timeout ID so it can be cancelled on next click
-                redirectTimeoutId = setTimeout(() => {
-                    removeRedirectMessage();
-                    chrome.tabs.create({ url: 'opera://configure/mods/manage' });
-                    window.close();
-                }, 3000);
+                // Only show redirect message and redirect if modsTabUrl is provided
+                if (modToProcess.modsTabUrl) {
+                    showRedirectMessage();
+
+                    // Store timeout ID so it can be cancelled on next click
+                    redirectTimeoutId = setTimeout(() => {
+                        removeRedirectMessage();
+                        chrome.tabs.create({ url: modToProcess.modsTabUrl });
+                        window.close();
+                    }, 3000);
+                } else {
+                    // No redirect - just show the message
+                    console.log('Mod enabled, no redirect (Open mods tab is OFF)');
+                }
             }
 
         } catch (error) {
@@ -824,6 +833,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     els.autoModToggle.addEventListener('change', () => onToggleChange('autoModIdentificationChecked', els.autoModToggle));
     els.openModsToggle.addEventListener('change', () => onToggleChange('uninstallAndReinstallChecked', els.openModsToggle));
+    els.openModsTabToggle.addEventListener('change', () => onToggleChange('openModsTabChecked', els.openModsTabToggle));
+    els.showNotificationsToggle.addEventListener('change', () => onToggleChange('showNotificationsChecked', els.showNotificationsToggle));
     els.startupToggle.addEventListener('change', () => onToggleChange('toggleRandomizeOnStartupChecked', els.startupToggle));
     els.setTimeToggle.addEventListener('change', () => onToggleChange('toggleRandomizeOnSetTimeChecked', els.setTimeToggle));
 // --- Toggle All Mods Button ---
@@ -939,6 +950,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const s = await storageGet([
             'autoModIdentificationChecked',
             'uninstallAndReinstallChecked',
+            'openModsTabChecked',
+            'showNotificationsChecked',
             'toggleRandomizeOnStartupChecked',
             'toggleRandomizeOnSetTimeChecked',
             'randomizeTime',
@@ -951,6 +964,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (els.autoModToggle) els.autoModToggle.checked = randomizeAll;
         els.openModsToggle.checked = s.uninstallAndReinstallChecked === undefined ? true : !!s.uninstallAndReinstallChecked;
+        els.openModsTabToggle.checked = s.openModsTabChecked === undefined ? true : !!s.openModsTabChecked;
+        els.showNotificationsToggle.checked = s.showNotificationsChecked === undefined ? true : !!s.showNotificationsChecked;
         els.startupToggle.checked = !!s.toggleRandomizeOnStartupChecked;
         els.setTimeToggle.checked = !!s.toggleRandomizeOnSetTimeChecked;
 

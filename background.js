@@ -294,10 +294,14 @@ async function handleModEnableWorkflow(modIdsForRandomization, uninstallAndReins
         await storage.set({ lastEnabledModId: selected.id, currentMod: selected.name });
         console.log(`[handleModEnableWorkflow] Enabled mod: ${selected.name}`);
 
+        // Check if "Open mods tab" is enabled
+        const { openModsTabChecked } = await storage.get('openModsTabChecked');
+        const shouldRedirect = openModsTabChecked === undefined ? true : !!openModsTabChecked;
+
         return {
             id: selected.id,
             name: selected.name,
-            modsTabUrl: 'opera://configure/mods/manage'
+            modsTabUrl: shouldRedirect ? 'opera://configure/mods/manage' : null
         };
     }
 
@@ -306,7 +310,14 @@ async function handleModEnableWorkflow(modIdsForRandomization, uninstallAndReins
 async function executeRandomization(source = 'unknown', redirectDelayMs = 3000) {
     console.log(`[executeRandomization] Source: ${source}`);
     try {
-        const s = await storage.get(['profiles', 'activeProfile', 'uninstallAndReinstallChecked', 'autoModIdentificationChecked']);
+        const s = await storage.get([
+            'profiles',
+            'activeProfile',
+            'uninstallAndReinstallChecked',
+            'autoModIdentificationChecked',
+            'openModsTabChecked',
+            'showNotificationsChecked'
+        ]);
         const { detectedModList = [] } = await storage.get('detectedModList');
         const useAll = !!s.autoModIdentificationChecked;
         const activeList = useAll ? detectedModList.map(m => m.id) : (s.profiles?.[s.activeProfile] || []);
@@ -324,6 +335,17 @@ async function executeRandomization(source = 'unknown', redirectDelayMs = 3000) 
 
             // Delay before showing notification: 5s for startup, 0.5s for alarm
             const notificationDelay = source === 'startup' ? 5000 : 500;
+
+            // Check if notifications are disabled
+            if (!s.showNotificationsChecked) {
+                // No notifications: just disable current, enable random, no redirect
+                const currentlyEnabled = mods.filter(m => m.enabled);
+                await Promise.all(currentlyEnabled.map(m => management.setEnabled(m.id, false)));
+                await management.setEnabled(selected.id, true);
+                await storage.set({ lastEnabledModId: selected.id, currentMod: selected.name });
+                console.log(`Auto randomization (no notifications): enabled ${selected.name}, no redirect`);
+                return null;
+            }
 
             if (s.uninstallAndReinstallChecked) {
                 // UNINSTALL MODE: Disable mods first, then show notification after delay
@@ -358,7 +380,7 @@ async function executeRandomization(source = 'unknown', redirectDelayMs = 3000) 
 
                 return null;
             } else {
-                // ENABLE MODE: Disable others, enable selected, show notification after delay, then redirect
+                // ENABLE MODE: Disable others, enable selected, show notification after delay
                 const currentlyEnabled = mods.filter(m => m.enabled);
                 await Promise.all(currentlyEnabled.map(m => management.setEnabled(m.id, false)));
                 await management.setEnabled(selected.id, true);
@@ -366,20 +388,34 @@ async function executeRandomization(source = 'unknown', redirectDelayMs = 3000) 
 
                 console.log(`Auto randomization (enable mode): enabled ${selected.name}, showing notification after delay`);
 
+                // Check if open mods tab is enabled
+                const shouldRedirect = s.openModsTabChecked;
+
                 setTimeout(() => {
-                    // Show notification explaining the redirect
+                    // Show notification
+                    const message = shouldRedirect
+                        ? `Enabled: ${selected.name}\n\nRedirecting to mods tab...`
+                        : `Enabled: ${selected.name}`;
+
                     chrome.notifications.create('modRandomizerAlert', {
                         type: 'basic',
                         iconUrl: 'icons/icon_128.png',
                         title: 'Mod Randomizer',
-                        message: `Enabled: ${selected.name}\n\nRedirecting to mods tab...`,
+                        message: message,
                         requireInteraction: false
                     });
 
-                    setTimeout(() => {
-                        chrome.tabs.create({ url: 'opera://configure/mods/manage' });
-                        chrome.notifications.clear('modRandomizerAlert');
-                    }, 3000);
+                    if (shouldRedirect) {
+                        setTimeout(() => {
+                            chrome.tabs.create({ url: 'opera://configure/mods/manage' });
+                            chrome.notifications.clear('modRandomizerAlert');
+                        }, 3000);
+                    } else {
+                        // Auto-clear notification after a few seconds if no redirect
+                        setTimeout(() => {
+                            chrome.notifications.clear('modRandomizerAlert');
+                        }, 5000);
+                    }
                 }, notificationDelay);
 
                 return null;
@@ -739,6 +775,8 @@ chrome.runtime.onInstalled.addListener(async details => {
       toggleRandomizeOnStartupChecked: false,
       autoModIdentificationChecked: true, // randomize-all: ON by default
       uninstallAndReinstallChecked: true,
+      openModsTabChecked: true, // open mods tab: ON by default
+      showNotificationsChecked: true, // show notifications: ON by default
       toggleRandomizeOnSetTimeChecked: false,
       randomizeTime: 0,
       currentMod: 'None'
@@ -748,11 +786,21 @@ chrome.runtime.onInstalled.addListener(async details => {
     await ensureDefaults();
   } else if (details.reason === 'update') {
     console.log('Extension updated');
-    // Migration: if key is missing, default to true (randomize-all ON)
-    const s = await storage.get('autoModIdentificationChecked');
+    // Migration: if key is missing, default to true
+    const s = await storage.get(['autoModIdentificationChecked', 'openModsTabChecked', 'showNotificationsChecked']);
+    const updates = {};
     if (s.autoModIdentificationChecked === undefined) {
-      await storage.set({ autoModIdentificationChecked: true });
-      console.log('Migration: set randomize-all ON (autoModIdentificationChecked=true)');
+      updates.autoModIdentificationChecked = true;
+    }
+    if (s.openModsTabChecked === undefined) {
+      updates.openModsTabChecked = true;
+    }
+    if (s.showNotificationsChecked === undefined) {
+      updates.showNotificationsChecked = true;
+    }
+    if (Object.keys(updates).length > 0) {
+      await storage.set(updates);
+      console.log('Migration: set defaults', updates);
     }
     await identifyModExtensions();
     await ensureDefaults();
