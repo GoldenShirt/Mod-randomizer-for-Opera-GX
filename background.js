@@ -337,7 +337,7 @@ async function handleModEnableWorkflow(modIdsForRandomization, source) {
         };
     }
 }// ---------------------- executeRandomization ----------------------
-async function executeRandomization(source = 'unknown', redirectDelayMs = 3000) {
+async function executeRandomization(source = 'unknown') {
     // This function should always be used for randomization from background. If it's not a "manual with uninstall on", then use this function.
     // The function should first check if uninstall is on. if it is, fetch the url. if the url is missing, call handleModEnableWorkflow to enable instead.
     // if uninstall isn't on, call handleModEnableWorkflow
@@ -550,7 +550,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
           case 'getRandomMod': {
               console.log('Message: getRandomMod received (direct from popup)');
               // Always use executeRandomization for any randomization from background
-              const result = await executeRandomization('manual', 3000);
+              const result = await executeRandomization('manual');
               sendResponse(result);
               break;
           }
@@ -746,7 +746,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 chrome.alarms.onAlarm.addListener(async alarm => {
   if (alarm.name === 'randomizeAlarm') {
     console.log('Alarm fired: randomizeAlarm');
-    await executeRandomization('alarm', 500); // short redirect for alarms
+    await executeRandomization('alarm');
   }
 });
 
@@ -759,7 +759,7 @@ chrome.runtime.onStartup.addListener(async () => {
   }
   if (s.toggleRandomizeOnStartupChecked) {
     console.log('onStartup -> toggleRandomizeOnStartupChecked true; scheduling startup randomize');
-    setTimeout(() => executeRandomization('startup', 5000), 1000);
+    setTimeout(() => executeRandomization('startup'), 1000);
   }
 });
 
