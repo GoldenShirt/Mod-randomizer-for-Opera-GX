@@ -35,23 +35,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Port connection for robust messaging ---
 
-
-
-    // Keep this listener for any OTHER messages the port might be used for.
+    // Listen for messages from background via port
     port.onMessage.addListener(async (msg) => {
         if (!msg || !msg.action) return;
 
-        // The 'randomizationCompleted' logic is now handled by the onRandomizeClick function.
-        // We have removed that block from here to avoid conflicts and to correctly
-        // handle the user gesture. The listener will now ignore that message.
-
-        // We keep other message handlers if they exist.
-        if (msg.action === 'redirectingNow') {
-            removeRedirectMessage();
-            console.log('Popup received redirectingNow via port');
+        if (msg.action === 'randomizationCompleted' && msg.enabledExtension) {
+            await showModMessage(msg.enabledExtension, false);
+            refreshCurrentMod();
+            console.log('Popup received randomizationCompleted via port');
+            // Acknowledge receipt so background can clear pendingRandomization
+            if (msg.pendingId) {
+                port.postMessage({ action: 'randomizationAck', pendingId: msg.pendingId });
+            }
         }
-
-        // You can add other 'else if' blocks here for other actions.
     });
     // Track which profile the UI is currently rendering/working with to avoid saving to a wrong profile on quick switches
     let currentProfile = null;
@@ -806,25 +802,11 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log('Time unit changed ->', newUnit);
     }
 
-    // --- Read & display currentMod & consume pendingRandomization ---
+    // --- Read & display currentMod ---
     async function refreshCurrentMod() {
         const s = await storageGet('currentMod');
         const name = s.currentMod || 'None';
         els.currentMod.textContent = `Active Mod: ${name}`;
-    }
-
-    async function consumePendingRandomization() {
-        const s = await storageGet('pendingRandomization');
-        const pending = s.pendingRandomization;
-        if (pending && pending.enabledExtension) {
-            const age = Date.now() - (pending.timestamp || 0);
-            if (age < 30 * 1000) {
-                await showModMessage(pending.enabledExtension, false); // for enable
-                console.log('Consumed pendingRandomization:', pending);
-            }
-            // clear it so it doesn't repeat
-            await storageSet({ pendingRandomization: null });
-        }
     }
 
     // --- Toggles handlers ---
@@ -914,22 +896,8 @@ document.addEventListener('DOMContentLoaded', () => {
         els.timeUnit.addEventListener('change', onTimeUnitChange);
     }
 
-    // Listen for background runtime notifications while popup is open
-    chrome.runtime.onMessage.addListener(async (msg) => {
-        if (msg?.action === 'randomizationCompleted' && msg.enabledExtension) {
-            await showModMessage(msg.enabledExtension, false); // for enable
-            refreshCurrentMod();
-            console.log('Popup received randomizationCompleted runtime message');
-            // Acknowledge receipt so background can clear pendingRandomization safely
-            if (msg.pendingId) {
-                sendMsg('randomizationAck', {pendingId: msg.pendingId});
-            }
-        } else if (msg?.action === 'redirectingNow') {
-            // Clear redirect message exactly when redirect starts (keeps the permanent hr intact)
-            removeRedirectMessage();
-            console.log('Popup received redirectingNow -> removed redirect message');
-        }
-    });
+    // Note: Background communication now happens via port (see port.onMessage listener above)
+    // No need for runtime.onMessage listener since we use ports
 
     // React to storage changes to stay up to date
     chrome.storage.onChanged.addListener((changes, area) => {
@@ -1009,8 +977,9 @@ document.addEventListener('DOMContentLoaded', () => {
         await loadAndRenderProfiles();
         await renderExtensionList();
         await refreshCurrentMod();
-        await consumePendingRandomization();
 
-        console.log('Popup initialized');
+        // Send popupReady via port to request any pending randomization from background
+        port.postMessage({ action: 'popupReady' });
+        console.log('Popup initialized, sent popupReady via port');
     })();
 });
