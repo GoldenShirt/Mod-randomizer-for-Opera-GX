@@ -11,7 +11,7 @@
   ],
   "host_permissions": [
     "https://api.gx.me/store/mods/update",
-    "https://raw.githubusercontent.com/GoldenShirt/Mod-randomizer-for-Opera-GX/main/url-catalog.json"
+    "https://raw.githubusercontent.com/Ido-Riko/Mod-randomizer-for-Opera-GX/main/url-catalog.json"
   ],
   "background": {
     "service_worker": "background.js"

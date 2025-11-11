@@ -131,7 +131,7 @@ async function ensureDefaults() {
     }
 }
 
-const CATALOG_URL = 'https://raw.githubusercontent.com/GoldenShirt/Mod-randomizer-for-Opera-GX/main/url-catalog.json';
+const CATALOG_URL = 'https://raw.githubusercontent.com/Ido-Riko/Mod-randomizer-for-Opera-GX/main/url-catalog.json';
 let catalog = {};
 // Load catalog immediately on background startup
 loadCatalog();
