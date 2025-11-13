@@ -11,7 +11,7 @@ You can manually switch mods like this, but it's possible to automate it with th
 
 You can customize which mods will be disabled and enabled, using the mod profiles. 
 
-(Disclaimer: I only know very basic coding so most of this was made by ChatGPT and Claude)
+(Disclaimer: Most of the code was written by ChatGPT and Claude)
 
 
 
