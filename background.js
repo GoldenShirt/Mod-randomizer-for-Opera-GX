@@ -265,6 +265,21 @@ async function enableMod(selectedMod, modsToDisable) {
   console.log(`[enableMod] Enabled mod: ${selectedMod.name}`);
 }
 
+async function disableModsOutsideActiveProfile(activeProfileIds = []) {
+  const profileIdSet = new Set(activeProfileIds);
+  const all = await management.getAll();
+  const enabledModsOutsideProfile = all.filter(mod =>
+    mod.updateUrl === 'https://api.gx.me/store/mods/update'
+    && mod.enabled
+    && !profileIdSet.has(mod.id)
+  );
+
+  if (!enabledModsOutsideProfile.length) return;
+
+  await Promise.all(enabledModsOutsideProfile.map(mod => management.setEnabled(mod.id, false)));
+  console.log(`[disableModsOutsideActiveProfile] Disabled ${enabledModsOutsideProfile.length} mod(s) outside active profile`);
+}
+
 async function triggerUXFeedback(source, selectedMod, settings, isUrlMissingFallback = false) {
   const openModsTabOn = settings.openModsTabChecked === undefined ? true : !!settings.openModsTabChecked;
 
@@ -398,7 +413,8 @@ async function executeRandomization(source = 'unknown') {
       'profiles', 'activeProfile', 'uninstallAndReinstallChecked',
       'autoModIdentificationChecked', 'openModsTabChecked',
       'showNotificationsChecked', 'lastEnabledModId',
-      'toggleRandomizeOnSetTimeChecked', 'lastRandomizationTime'
+      'toggleRandomizeOnSetTimeChecked', 'lastRandomizationTime',
+      'disableModsOutsideProfileChecked'
     ]);
 
     if (source === 'alarm' && !s.toggleRandomizeOnSetTimeChecked) {
@@ -419,6 +435,7 @@ async function executeRandomization(source = 'unknown') {
 
     const { detectedModList = [] } = await storage.get('detectedModList');
     const useAll = !!s.autoModIdentificationChecked;
+    const activeProfileList = s.profiles?.[s.activeProfile] || [];
     const activeList = useAll ? detectedModList.map(m => m.id) : (s.profiles?.[s.activeProfile] || []);
 
     if (!activeList || activeList.length === 0) {
@@ -428,6 +445,10 @@ async function executeRandomization(source = 'unknown') {
 
     await storage.remove('pendingNotification');
     await storage.set({ lastRandomizationTime: nowMs() });
+
+    if (s.disableModsOutsideProfileChecked && !useAll) {
+      await disableModsOutsideActiveProfile(activeProfileList);
+    }
 
     let result = null;
 
@@ -742,12 +763,15 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         case 'setActiveProfile': {
           const { profileName } = message;
           const name = (profileName || '').trim();
-          const { profiles = {} } = await storage.get('profiles');
+          const { profiles = {}, disableModsOutsideProfileChecked = false } = await storage.get(['profiles', 'disableModsOutsideProfileChecked']);
           if (!profiles[name]) {
             sendResponse({ status: 'error', message: 'Profile not found' });
             break;
           }
           await storage.set({ activeProfile: name });
+          if (disableModsOutsideProfileChecked) {
+            await disableModsOutsideActiveProfile(profiles[name] || []);
+          }
           console.log('Active profile set to', name);
           sendResponse({ status: 'success' });
           break;
@@ -804,6 +828,7 @@ chrome.runtime.onInstalled.addListener(async details => {
       uninstallAndReinstallChecked: true,
       openModsTabChecked: true, // open mods tab: ON by default
       showNotificationsChecked: true, // show notifications: ON by default
+      disableModsOutsideProfileChecked: false,
       toggleRandomizeOnSetTimeChecked: false,
       randomizeTime: 0,
       currentMod: 'None'
@@ -814,7 +839,7 @@ chrome.runtime.onInstalled.addListener(async details => {
   } else if (details.reason === 'update') {
     console.log('Extension updated');
     // Migration: if key is missing, default appropriately
-    const s = await storage.get(['autoModIdentificationChecked', 'openModsTabChecked', 'showNotificationsChecked']);
+    const s = await storage.get(['autoModIdentificationChecked', 'openModsTabChecked', 'showNotificationsChecked', 'disableModsOutsideProfileChecked']);
     const updates = {};
     if (s.autoModIdentificationChecked === undefined) {
       updates.autoModIdentificationChecked = false;
@@ -824,6 +849,9 @@ chrome.runtime.onInstalled.addListener(async details => {
     }
     if (s.showNotificationsChecked === undefined) {
       updates.showNotificationsChecked = true;
+    }
+    if (s.disableModsOutsideProfileChecked === undefined) {
+      updates.disableModsOutsideProfileChecked = false;
     }
     if (Object.keys(updates).length > 0) {
       await storage.set(updates);
