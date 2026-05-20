@@ -10,6 +10,7 @@ export function initEls() {
     els.newProfileBtn = document.getElementById('newProfileBtn');
     els.deleteProfileBtn = document.getElementById('deleteProfileBtn');
     els.autoModToggle = document.getElementById('randomizeAllMods');
+    els.disableOutsideProfileToggle = document.getElementById('disableModsOutsideProfile');
     els.openModsToggle = document.getElementById('uninstallAndReinstall');
     els.openModsTabToggle = document.getElementById('openModsTab');
     els.showNotificationsToggle = document.getElementById('showNotifications');

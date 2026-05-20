@@ -125,11 +125,13 @@ document.addEventListener('DOMContentLoaded', () => {
             'autoModIdentificationChecked', 'uninstallAndReinstallChecked',
             'openModsTabChecked', 'showNotificationsChecked',
             'toggleRandomizeOnStartupChecked', 'toggleRandomizeOnSetTimeChecked',
-            'randomizeTime', 'timeUnit', 'currentMod', 'pendingNotification'
+            'randomizeTime', 'timeUnit', 'currentMod', 'pendingNotification',
+            'disableModsOutsideProfileChecked'
         ]);
 
         const randomizeAll = s.autoModIdentificationChecked === undefined ? false : !!s.autoModIdentificationChecked;
         if (els.autoModToggle) els.autoModToggle.checked = randomizeAll;
+        if (els.disableOutsideProfileToggle) els.disableOutsideProfileToggle.checked = !!s.disableModsOutsideProfileChecked;
         if (els.openModsToggle) els.openModsToggle.checked = s.uninstallAndReinstallChecked === undefined ? true : !!s.uninstallAndReinstallChecked;
         if (els.openModsTabToggle) els.openModsTabToggle.checked = s.openModsTabChecked === undefined ? true : !!s.openModsTabChecked;
         if (els.showNotificationsToggle) els.showNotificationsToggle.checked = s.showNotificationsChecked === undefined ? true : !!s.showNotificationsChecked;
@@ -352,6 +354,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     els.autoModToggle.addEventListener('change', () => onToggleChange('autoModIdentificationChecked', els.autoModToggle));
+    if (els.disableOutsideProfileToggle) {
+        els.disableOutsideProfileToggle.addEventListener('change', () => onToggleChange('disableModsOutsideProfileChecked', els.disableOutsideProfileToggle));
+    }
     els.openModsToggle.addEventListener('change', () => onToggleChange('uninstallAndReinstallChecked', els.openModsToggle));
     els.openModsTabToggle.addEventListener('change', () => onToggleChange('openModsTabChecked', els.openModsTabToggle));
     els.showNotificationsToggle.addEventListener('change', () => onToggleChange('showNotificationsChecked', els.showNotificationsToggle));
