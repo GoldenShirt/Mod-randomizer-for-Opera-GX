@@ -227,10 +227,16 @@ async function addDetectedModsToAllProfiles(autoIdentify /* randomizeAllMods */)
 
   // Update knownDetectedIds to include all currently detected ids (union)
   const updatedKnown = Array.from(new Set([...knownDetectedIds, ...detectedIds]));
-  // Persist storage updates atomically
+  const previousKnownArray = Array.isArray(knownWrapper.knownDetectedIds) ? knownWrapper.knownDetectedIds : [];
+  const previousKnownSet = new Set(previousKnownArray);
+  const knownChanged = updatedKnown.length !== previousKnownSet.size
+    || updatedKnown.some(id => !previousKnownSet.has(id));
+
+  // Persist only when data changed
   if (mutated) {
-    await storage.set({ profiles, knownDetectedIds: updatedKnown });
-  } else {
+    if (knownChanged) await storage.set({ profiles, knownDetectedIds: updatedKnown });
+    else await storage.set({ profiles });
+  } else if (knownChanged) {
     await storage.set({ knownDetectedIds: updatedKnown });
   }
 
@@ -338,7 +344,8 @@ async function handleModEnableWorkflow(modIdsForRandomization, source, specificM
 
   const settings = await storage.get(['lastEnabledModId', 'openModsTabChecked', 'showNotificationsChecked']);
   const all = await management.getAll();
-  const mods = all.filter(e => modIdsForRandomization.includes(e.id));
+  const modIdSet = new Set(modIdsForRandomization);
+  const mods = all.filter(e => modIdSet.has(e.id));
 
   if (!mods.length) {
     console.warn('[handleModEnableWorkflow] No mods found in management');

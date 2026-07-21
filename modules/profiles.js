@@ -18,9 +18,11 @@ export async function ensureProfilesOrder(profiles) {
             changed = true;
         } else {
             const enabled = Array.isArray(profiles[profileName]) ? profiles[profileName] : [];
+            const orderSet = new Set(profilesOrder[profileName]);
             for (const id of enabled) {
-                if (!profilesOrder[profileName].includes(id)) {
+                if (!orderSet.has(id)) {
                     profilesOrder[profileName].push(id);
+                    orderSet.add(id);
                     changed = true;
                 }
             }

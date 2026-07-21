@@ -469,6 +469,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 clearTimeout(redirectTimeoutId);
                 redirectTimeoutId = null;
             }
+            removeRedirectMessage();
 
             const st = await storageGet('uninstallAndReinstallChecked');
             const uninstallAndReinstall = !!st.uninstallAndReinstallChecked;
@@ -522,8 +523,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 Object.keys(changes.profiles.newValue || {}).join('|') !== Object.keys(changes.profiles.oldValue || {}).join('|'))
             || !!changes.activeProfile;
 
+        const extensionRenderKeys = new Set([
+            'profiles',
+            'profilesOrder',
+            'activeProfile',
+            'detectedModList',
+            'autoModIdentificationChecked',
+            'recentlyUninstalled'
+        ]);
+        const shouldRenderExtensionList = Object.keys(changes).some(k => extensionRenderKeys.has(k));
+
         if (shouldReloadProfiles) loadAndRenderProfiles();
-        renderExtensionList();
+        if (shouldRenderExtensionList) renderExtensionList();
     });
 
 });
