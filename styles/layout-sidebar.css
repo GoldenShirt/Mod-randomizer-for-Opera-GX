@@ -1,0 +1,9 @@
+body {
+    width: 100%;
+    max-width: 400px;
+    min-height: 100vh;
+}
+
+.popup-container {
+    min-height: 100vh;
+}
