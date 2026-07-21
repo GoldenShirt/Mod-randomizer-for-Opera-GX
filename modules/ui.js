@@ -113,6 +113,16 @@ export function clearEnabledMessage() {
 let autoClearTimerId = null;
 let redirectTimeoutId = null;
 let redirectIntervalId = null;
+let lastRenderSignature = null;
+
+function clearRedirectIntervalInArea(redirectArea) {
+    if (!redirectArea) return;
+    const el = redirectArea.querySelector('.redirect-message');
+    if (el?.dataset.intervalId) {
+        clearInterval(parseInt(el.dataset.intervalId, 10));
+        delete el.dataset.intervalId;
+    }
+}
 
 export async function showModMessage(mod, uninstallAndReinstall) {
     const { enabledArea, redirectArea } = ensureMessageAreas();
@@ -121,6 +131,7 @@ export async function showModMessage(mod, uninstallAndReinstall) {
     // Note: global timers were in popup.js, here we scope them if possible or ignore
     // For simplicity, we just clear DOM
     enabledArea.innerHTML = '';
+    clearRedirectIntervalInArea(redirectArea);
     redirectArea.innerHTML = '';
 
     const d = document.createElement('div');
@@ -148,6 +159,7 @@ export async function showModMessage(mod, uninstallAndReinstall) {
 
 export function showRedirectMessage() {
     const { redirectArea } = ensureMessageAreas();
+    clearRedirectIntervalInArea(redirectArea);
     redirectArea.innerHTML = '';
 
     const placeholder = document.createElement('p');
@@ -167,8 +179,7 @@ export function showRedirectMessage() {
 export function removeRedirectMessage() {
     const redirectArea = document.getElementById('redirect-area');
     if (redirectArea) {
-        const el = redirectArea.querySelector('.redirect-message');
-        if (el?.dataset.intervalId) clearInterval(parseInt(el.dataset.intervalId));
+        clearRedirectIntervalInArea(redirectArea);
         redirectArea.innerHTML = '';
     }
     removeMessageAreasIfEmpty();
@@ -176,6 +187,7 @@ export function removeRedirectMessage() {
 
 export function showMissedNotificationMessage(mod, onReinstallCallback) {
     const { redirectArea } = ensureMessageAreas();
+    clearRedirectIntervalInArea(redirectArea);
     redirectArea.innerHTML = '';
 
     const container = document.createElement('div');
@@ -352,6 +364,19 @@ export async function renderExtensionList(forceProfileName = null) {
         return collator.compare(nameA, nameB);
     });
 
+    const profileListSet = new Set(profileList);
+    const renderSignature = JSON.stringify({
+        randomizeAll,
+        active,
+        sortedOrder,
+        names: sortedOrder.map(id => detectedMap.get(id) || (recentlyUninstalled[id] && recentlyUninstalled[id].name) || 'Unknown Mod (not detected)'),
+        checked: randomizeAll ? sortedOrder : sortedOrder.filter(id => profileListSet.has(id))
+    });
+
+    if (renderSignature === lastRenderSignature) {
+        return;
+    }
+
     // Render
     els.extensionList.innerHTML = '';
     els.extensionList.classList.toggle('disabled', randomizeAll);
@@ -418,7 +443,7 @@ export async function renderExtensionList(forceProfileName = null) {
             cb.checked = true;
             cb.disabled = true;
         } else {
-            cb.checked = profileList.includes(id);
+            cb.checked = profileListSet.has(id);
             cb.disabled = false;
             cb.addEventListener('change', handleCheckboxChange);
         }
@@ -427,6 +452,8 @@ export async function renderExtensionList(forceProfileName = null) {
         li.appendChild(label);
         els.extensionList.appendChild(li);
     }
+
+    lastRenderSignature = renderSignature;
 
     // Also export a trigger for external bulk toggles
     return { handleCheckboxChange };
